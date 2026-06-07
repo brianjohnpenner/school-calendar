@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Create and print a one-page school calendar." />
+    <title>School Calendar Generator</title>
+  </head>
+  <body>
+    <div x-data="calendarApp" x-cloak class="min-h-screen">
+      <header class="border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <button class="flex items-center gap-3 text-left" @click="view = activeCalendar ? 'editor' : 'home'">
+            <span class="grid size-10 place-items-center rounded-xl bg-cyan-900 text-lg font-bold text-white">SC</span>
+            <span>
+              <strong class="block text-sm text-slate-900">School Calendar Generator</strong>
+              <span class="text-xs text-slate-500">Private, local, and printable</span>
+            </span>
+          </button>
+          <div class="flex items-center gap-2">
+            <button class="btn-secondary hidden sm:inline-flex" @click="importOpen = true">Import JSON</button>
+            <button class="btn-primary" @click="startWizard()">New calendar</button>
+          </div>
+        </div>
+      </header>
+
+      <div x-show="notice" x-transition class="fixed right-4 top-20 z-[70] rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl" x-text="notice"></div>
+
+      <main x-show="view === 'home'" class="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+        <section class="mb-12 text-center">
+          <p class="mb-3 text-sm font-bold uppercase tracking-[.18em] text-cyan-800">One page. Your school year.</p>
+          <h1 class="text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">Build a calendar that is ready to print.</h1>
+          <p class="mx-auto mt-4 max-w-2xl text-lg leading-8 text-slate-600">Choose your term, add school events and suggested holidays, then print the entire year on one Letter-sized page.</p>
+          <button class="btn-primary mt-7 px-6 py-3" @click="startWizard()">Create a school calendar</button>
+        </section>
+        <section x-show="state.calendars.length" class="panel p-5">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold">Saved calendars</h2>
+            <button class="btn-quiet" @click="exportAll()">Download all</button>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <template x-for="calendar in state.calendars" :key="calendar.id">
+              <button class="rounded-xl border border-slate-200 p-4 text-left transition hover:border-cyan-700 hover:bg-cyan-50/40" @click="selectCalendar(calendar.id)">
+                <strong class="block text-slate-900" x-text="calendar.name"></strong>
+                <span class="mt-1 block text-sm text-slate-500" x-text="`${calendar.schoolName} · ${calendar.term.firstDay.slice(0, 4)}–${calendar.term.lastDay.slice(0, 4)}`"></span>
+              </button>
+            </template>
+          </div>
+        </section>
+      </main>
+
+      <main x-show="view === 'wizard'" class="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <div class="mb-8 flex items-center gap-3">
+          <template x-for="step in [1,2,3,4]">
+            <div class="flex flex-1 items-center gap-3">
+              <span class="grid size-8 shrink-0 place-items-center rounded-full text-sm font-bold" :class="wizardStep >= step ? 'bg-cyan-800 text-white' : 'bg-slate-200 text-slate-500'" x-text="step"></span>
+              <span class="h-0.5 flex-1 bg-slate-200" x-show="step < 4"></span>
+            </div>
+          </template>
+        </div>
+        <section class="panel p-6 sm:p-8">
+          <div x-show="wizardStep === 1">
+            <p class="text-sm font-semibold text-cyan-800">Step 1 of 4</p>
+            <h1 class="mt-1 text-2xl font-semibold">Name your calendar</h1>
+            <div class="mt-6 grid gap-5">
+              <label class="field">Calendar name<input x-model="draft.name" placeholder="2026–2027 School Calendar"></label>
+              <label class="field">School name<input x-model="draft.schoolName" placeholder="Cedar Valley School"></label>
+            </div>
+            <div class="mt-8 flex justify-between">
+              <button class="btn-quiet" @click="view = activeCalendar ? 'editor' : 'home'">Cancel</button>
+              <button class="btn-primary" :disabled="!draft.name.trim() || !draft.schoolName.trim()" @click="wizardStep = 2">Continue</button>
+            </div>
+          </div>
+          <div x-show="wizardStep === 2">
+            <p class="text-sm font-semibold text-cyan-800">Step 2 of 4</p>
+            <h1 class="mt-1 text-2xl font-semibold">Set the school year</h1>
+            <div class="mt-6 grid gap-5 sm:grid-cols-2">
+              <label class="field">First day of school<input type="date" x-model="draft.firstDay"></label>
+              <label class="field">Last day of school<input type="date" x-model="draft.lastDay"></label>
+              <label class="field">Country<select x-model="draft.country" @change="countryChanged()"><template x-for="(country, code) in regions"><option :value="code" x-text="country.label"></option></template></select></label>
+              <label class="field">Province or state<select x-model="draft.subdivision"><template x-for="(label, code) in subdivisions"><option :value="code" x-text="label"></option></template></select></label>
+            </div>
+            <p class="mt-4 rounded-xl px-4 py-3 text-sm" :class="termMonthCount >= 8 && termMonthCount <= 12 ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'">
+              <span x-text="termMonthCount || 0"></span> calendar months selected. Choose a term spanning 8–12 months.
+            </p>
+            <div class="mt-8 flex justify-between">
+              <button class="btn-secondary" @click="wizardStep = 1">Back</button>
+              <button class="btn-primary" :disabled="!wizardValid" @click="prepareBreakSuggestions()">Continue</button>
+            </div>
+          </div>
+          <div x-show="wizardStep === 3">
+            <p class="text-sm font-semibold text-cyan-800">Step 3 of 4</p>
+            <h1 class="mt-1 text-2xl font-semibold">Choose school breaks</h1>
+            <p class="mt-2 text-sm text-slate-600">Select the vacations your school observes and adjust their dates.</p>
+            <div class="mt-5 space-y-3">
+              <template x-for="schoolBreak in breakSuggestions" :key="schoolBreak.suggestionId">
+                <section class="rounded-xl border border-slate-200 p-4">
+                  <label class="flex cursor-pointer items-center gap-3">
+                    <input class="size-4 accent-cyan-800" type="checkbox" x-model="schoolBreak.enabled">
+                    <strong class="text-sm" x-text="schoolBreak.title"></strong>
+                  </label>
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2" :class="schoolBreak.enabled ? '' : 'opacity-45'">
+                    <label class="field">Start date<input type="date" x-model="schoolBreak.startDate" :disabled="!schoolBreak.enabled"></label>
+                    <label class="field">End date<input type="date" x-model="schoolBreak.endDate" :disabled="!schoolBreak.enabled"></label>
+                  </div>
+                  <p x-show="schoolBreak.enabled && (schoolBreak.startDate > schoolBreak.endDate || schoolBreak.startDate < draft.firstDay || schoolBreak.endDate > draft.lastDay)" class="mt-3 text-sm text-red-700">Break dates must be in the school year, with the start on or before the end.</p>
+                </section>
+              </template>
+            </div>
+            <div class="mt-8 flex justify-between">
+              <button class="btn-secondary" @click="wizardStep = 2">Back</button>
+              <button class="btn-primary" :disabled="!breaksValid || loadingHolidays" @click="loadSuggestions()" x-text="loadingHolidays ? 'Loading holidays…' : 'Find public holidays'"></button>
+            </div>
+          </div>
+          <div x-show="wizardStep === 4">
+            <p class="text-sm font-semibold text-cyan-800">Step 4 of 4</p>
+            <h1 class="mt-1 text-2xl font-semibold">Choose suggested holidays</h1>
+            <p class="mt-2 text-sm text-slate-600">These suggestions are editable after the calendar is created.</p>
+            <div class="mt-5 max-h-[420px] space-y-2 overflow-y-auto pr-1">
+              <template x-for="holiday in suggestions" :key="holiday.suggestionId">
+                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
+                  <input class="mt-1 size-4 accent-cyan-800" type="checkbox" :value="holiday.suggestionId" x-model="selectedSuggestions">
+                  <span class="min-w-0">
+                    <strong class="block text-sm" x-text="holiday.title"></strong>
+                    <span class="text-xs text-slate-500" x-text="`${formatDate(holiday.startDate)}${holiday.holiday.observed ? ' · Observed' : ''}`"></span>
+                  </span>
+                </label>
+              </template>
+              <p x-show="!suggestions.length" class="rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-500">No public holiday suggestions were found for this term.</p>
+            </div>
+            <div class="mt-8 flex justify-between">
+              <button class="btn-secondary" @click="wizardStep = 3">Back</button>
+              <button class="btn-primary" @click="createFromWizard()">Create calendar</button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <main x-show="view === 'editor' && activeCalendar" class="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Calendar</label>
+            <select class="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold" :value="state.activeCalendarId" @change="selectCalendar($event.target.value)">
+              <template x-for="calendar in state.calendars" :key="calendar.id"><option :value="calendar.id" x-text="calendar.name"></option></template>
+            </select>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-secondary sm:hidden" @click="importOpen = true">Import</button>
+            <button class="btn-secondary" @click="openEvent()">Add event</button>
+            <button class="btn-secondary" @click="editWizardCalendar()">Settings</button>
+            <button class="btn-primary" @click="printCalendar()">Print calendar</button>
+          </div>
+        </div>
+
+        <div class="grid items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[330px_minmax(0,1fr)]">
+          <aside class="panel overflow-hidden">
+            <div class="border-b border-slate-200 p-4">
+              <div class="flex items-center justify-between">
+                <h2 class="font-semibold">Events</h2>
+                <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600" x-text="(activeCalendar?.events.length ?? 0) + 2"></span>
+              </div>
+            </div>
+            <div class="max-h-[520px] divide-y divide-slate-100 overflow-y-auto">
+              <button class="block w-full p-4 text-left hover:bg-slate-50" @click="editWizardCalendar()">
+                <strong class="block text-sm text-blue-800">First Day of School</strong>
+                <span class="text-xs text-slate-500" x-text="activeCalendar ? formatDate(activeCalendar.term.firstDay) : ''"></span>
+              </button>
+              <template x-for="event in activeCalendar ? [...activeCalendar.events].sort((a,b) => a.startDate.localeCompare(b.startDate)) : []" :key="event.id">
+                <button class="block w-full p-4 text-left hover:bg-slate-50" @click="openEvent(event)">
+                  <strong class="event-list-label block truncate text-sm" :class="categories[event.category].className" x-text="event.title"></strong>
+                  <span class="text-xs text-slate-500" x-text="event.startDate === event.endDate ? formatDate(event.startDate) : `${formatDate(event.startDate)} – ${formatDate(event.endDate)}`"></span>
+                </button>
+              </template>
+              <button class="block w-full p-4 text-left hover:bg-slate-50" @click="editWizardCalendar()">
+                <strong class="block text-sm text-blue-800">Last Day of School</strong>
+                <span class="text-xs text-slate-500" x-text="activeCalendar ? formatDate(activeCalendar.term.lastDay) : ''"></span>
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 border-t border-slate-200 p-3">
+              <button class="btn-quiet" @click="shareCurrent()">Share</button>
+              <button class="btn-quiet" @click="exportCurrent()">Download</button>
+              <button class="btn-quiet" @click="duplicateCalendar()">Duplicate</button>
+              <button class="btn-quiet text-red-700 hover:bg-red-50" @click="deleteCalendar()">Delete</button>
+            </div>
+          </aside>
+
+          <section class="calendar-preview-wrap rounded-2xl bg-slate-300/60 p-3 sm:p-6">
+            <article id="print-sheet" class="calendar-sheet" :class="printDensityClass" :style="`--month-rows: ${Math.ceil(months.length / 2)}`">
+              <header class="calendar-header">
+                <div class="calendar-identity">
+                  <span class="calendar-mark" aria-hidden="true">★</span>
+                  <div>
+                    <h1 x-text="activeCalendar ? activeCalendar.schoolName : ''"></h1>
+                    <div class="calendar-legend">
+                      <span><i class="legend-dot legend-school"></i>School event</span>
+                      <span><i class="legend-ring legend-holiday"></i>Holiday</span>
+                      <span><i class="legend-bar legend-break"></i>Break</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="calendar-year">
+                  <strong x-text="shortSchoolYearLabel()"></strong>
+                  <span>School Calendar</span>
+                </div>
+              </header>
+              <div class="months-grid">
+                <template x-for="(month, monthIndex) in months" :key="`${month.year}-${month.month}`">
+                  <section class="month-block" :style="`--month-accent: ${monthAccent(monthIndex)}`">
+                    <h2 class="month-heading">
+                      <span x-text="monthName(month.year, month.month).split(' ')[0]"></span>
+                      <small x-text="month.year"></small>
+                    </h2>
+                    <table class="month-table">
+                      <thead><tr><template x-for="(day, dayIndex) in weekdays"><th :class="{ 'weekend': dayIndex === 0 || dayIndex === 6 }" x-text="day.slice(0, 1)"></th></template></tr></thead>
+                      <tbody>
+                        <template x-for="week in Math.ceil(monthGrid(month.year, month.month).length / 7)">
+                          <tr>
+                            <template x-for="column in 7">
+                              <td :class="{ 'weekend': column === 1 || column === 7 }">
+                                <template x-if="monthGrid(month.year, month.month)[(week - 1) * 7 + column - 1]">
+                                  <span class="day-number" :class="dayClasses(isoDate(month.year, month.month, monthGrid(month.year, month.month)[(week - 1) * 7 + column - 1]))" x-text="monthGrid(month.year, month.month)[(week - 1) * 7 + column - 1]"></span>
+                                </template>
+                              </td>
+                            </template>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                    <div class="month-events">
+                      <template x-for="event in eventsForMonth(month.year, month.month)" :key="`${event.id}-${month.year}-${month.month}`">
+                        <div class="month-event" :class="categories[event.category].className">
+                          <span class="month-event-date" x-text="formatEventDate(event)"></span>
+                          <span class="month-event-title" x-text="event.title"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </section>
+                </template>
+              </div>
+            </article>
+          </section>
+        </div>
+      </main>
+
+      <div x-show="eventDialogOpen" class="modal-backdrop" @keydown.escape.window="eventDialogOpen = false">
+        <form class="modal-card" @submit.prevent="saveEvent()">
+          <div class="mb-6 flex items-center justify-between"><h2 class="text-xl font-semibold" x-text="eventForm.id ? 'Edit event' : 'Add event'"></h2><button type="button" class="btn-quiet" @click="eventDialogOpen = false">Close</button></div>
+          <div class="grid gap-5">
+            <label class="field">Event name<input x-model="eventForm.title" required></label>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="field">Start date<input type="date" x-model="eventForm.startDate" required></label>
+              <label class="field">End date<input type="date" x-model="eventForm.endDate" required></label>
+            </div>
+            <label class="field">Category<select x-model="eventForm.category"><template x-for="(category, key) in categories"><option :value="key" x-text="category.label"></option></template></select></label>
+            <p x-show="eventForm.startDate > eventForm.endDate" class="text-sm text-red-700">End date must be on or after the start date.</p>
+          </div>
+          <div class="mt-7 flex items-center justify-between">
+            <button x-show="eventForm.id" type="button" class="btn-quiet text-red-700" @click="deleteEvent(eventForm.id)">Delete event</button>
+            <span x-show="!eventForm.id"></span>
+            <button class="btn-primary" :disabled="!eventForm.title.trim() || eventForm.startDate > eventForm.endDate">Save event</button>
+          </div>
+        </form>
+      </div>
+
+      <div x-show="settingsOpen" class="modal-backdrop" @keydown.escape.window="settingsOpen = false">
+        <form class="modal-card" @submit.prevent="saveSettings()">
+          <div class="mb-6 flex items-center justify-between"><h2 class="text-xl font-semibold">Calendar settings</h2><button type="button" class="btn-quiet" @click="settingsOpen = false">Close</button></div>
+          <div class="grid gap-5">
+            <label class="field">Calendar name<input x-model="draft.name"></label>
+            <label class="field">School name<input x-model="draft.schoolName"></label>
+            <div class="grid gap-4 sm:grid-cols-2"><label class="field">First day<input type="date" x-model="draft.firstDay"></label><label class="field">Last day<input type="date" x-model="draft.lastDay"></label></div>
+            <div class="grid gap-4 sm:grid-cols-2"><label class="field">Country<select x-model="draft.country" @change="countryChanged()"><template x-for="(country, code) in regions"><option :value="code" x-text="country.label"></option></template></select></label><label class="field">Province or state<select x-model="draft.subdivision"><template x-for="(label, code) in subdivisions"><option :value="code" x-text="label"></option></template></select></label></div>
+            <p x-show="termMonthCount < 8 || termMonthCount > 12" class="text-sm text-red-700">The term must span 8–12 calendar months.</p>
+          </div>
+          <div class="mt-7 flex justify-end"><button class="btn-primary" :disabled="!wizardValid">Save settings</button></div>
+        </form>
+      </div>
+
+      <div x-show="importOpen" class="modal-backdrop" @keydown.escape.window="importOpen = false">
+        <section class="modal-card">
+          <div class="mb-5 flex items-center justify-between"><div><h2 class="text-xl font-semibold">Import calendars</h2><p class="mt-1 text-sm text-slate-500">Review calendars before adding them.</p></div><button class="btn-quiet" @click="importOpen = false">Close</button></div>
+          <label class="grid cursor-pointer place-items-center rounded-2xl border-2 border-dashed border-slate-300 px-5 py-10 text-center hover:border-cyan-700 hover:bg-cyan-50/40" @dragover.prevent @drop.prevent="handleDrop($event)">
+            <strong class="text-sm">Drop a calendar JSON file here</strong><span class="mt-1 text-xs text-slate-500">or click to choose a file</span>
+            <input type="file" accept=".json,application/json" class="sr-only" @change="readImport($event.target.files[0])">
+          </label>
+          <p x-show="importError" class="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-800" x-text="importError"></p>
+          <div x-show="importPreviews.length" class="mt-5 space-y-3">
+            <template x-for="preview in importPreviews">
+              <label class="flex gap-3 rounded-xl border border-slate-200 p-4">
+                <input type="checkbox" class="mt-1 size-4 accent-cyan-800" x-model="preview.selected" :disabled="preview.errors.length">
+                <span class="min-w-0"><strong class="block" x-text="preview.calendar.name"></strong><span class="text-sm text-slate-500" x-text="`${preview.calendar.schoolName} · ${preview.calendar.events.length} events`"></span><template x-for="error in preview.errors"><span class="mt-1 block text-xs text-red-700" x-text="error"></span></template></span>
+              </label>
+            </template>
+            <div class="flex justify-end"><button class="btn-primary" @click="confirmImport()">Import selected</button></div>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

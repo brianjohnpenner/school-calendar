@@ -136,9 +136,16 @@ document.addEventListener('alpine:init', () => {
     dayClasses(date) {
       const events = eventsForDay(this.activeCalendar, date)
       if (!events.length) return ''
-      const event = events[0]
-      const marker = event.startDate === event.endDate ? 'event-dot' : 'event-range'
-      return `${categories[event.category]?.className ?? ''} ${marker}`
+      const singleDayEvent = events.find((event) => event.startDate === event.endDate)
+      const rangeEvent = events.find((event) => event.startDate !== event.endDate)
+      const event = singleDayEvent ?? rangeEvent
+      const markers = [
+        singleDayEvent ? 'event-dot' : '',
+        rangeEvent ? 'event-range' : '',
+        singleDayEvent && rangeEvent ? 'event-layered' : '',
+      ]
+
+      return `${categories[event.category]?.className ?? ''} ${markers.join(' ')}`
     },
     schoolYearLabel() { return schoolYearLabel(this.activeCalendar) },
     shortSchoolYearLabel() {

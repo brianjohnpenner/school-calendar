@@ -117,26 +117,54 @@ button { cursor: pointer; }
 }
 .month-heading small { color: #a9b4c9; font-size: 8px; font-weight: 700; }
 .month-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border-bottom: 1px solid #ddd8cc; font-size: 9px; }
-.month-table th { height: 13px; border-bottom: 1px solid #ddd8cc; font-size: 7px; font-weight: 700; color: #53627f; }
-.month-table td { height: 14px; padding: 0; text-align: center; color: #17233f; font-weight: 650; }
+.month-table th { height: 13px; padding: 0; border-bottom: 1px solid #ddd8cc; color: #53627f; font-size: 7px; font-weight: 700; text-align: center; }
+.month-table td { height: 17px; padding: 0; text-align: center; color: #17233f; font-weight: 650; }
 .month-table .weekend { color: #aeb8cc; }
-.day-number { position: relative; z-index: 0; display: grid; width: 100%; height: 13px; place-items: center; border-radius: 999px; }
+.day-number {
+  --event-marker-color: var(--month-accent);
+  position: relative;
+  z-index: 0;
+  display: grid;
+  width: 100%;
+  height: 16px;
+  place-items: center;
+  border-radius: 999px;
+}
 .day-number.event-dot {
-  width: 14px;
+  --event-circle-size: 19px;
+  width: var(--event-circle-size);
+  height: var(--event-circle-size);
   margin: 0 auto;
-  border: 1.5px solid var(--month-accent);
-  color: var(--month-accent);
+  color: var(--event-marker-color);
   font-weight: 800;
 }
+.day-number.event-dot::before {
+  position: absolute;
+  width: var(--event-circle-size);
+  height: var(--event-circle-size);
+  border: 1.5px solid var(--event-marker-color);
+  border-radius: 999px;
+  background: white;
+  box-sizing: border-box;
+  content: "";
+  z-index: -1;
+}
 .day-number.event-range {
+  width: 100%;
+  margin: 0;
+  border: 0;
   border-radius: 2px;
   background: color-mix(in srgb, var(--month-accent) 15%, white);
   color: var(--month-accent);
   font-weight: 800;
 }
+.day-number.event-layered {
+  background-color: color-mix(in srgb, var(--month-accent) 15%, white);
+  color: var(--event-marker-color);
+}
 .month-events { margin-top: 4px; display: grid; gap: 1px; min-height: 18px; font-size: 7.7px; font-weight: 600; line-height: 1.15; }
 .month-event { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 5px; overflow: hidden; background: transparent !important; color: #17233f; white-space: nowrap; }
-.month-event-date { overflow: hidden; color: var(--month-accent); font-weight: 800; text-align: right; text-overflow: ellipsis; }
+.month-event-date { overflow: hidden; color: inherit; font-weight: 800; text-align: right; text-overflow: ellipsis; }
 .month-event-title { overflow: hidden; text-overflow: ellipsis; }
 .event-school { background: #cfe4f5; color: #07539a; }
 .event-administration { background: #e8e3f5; color: #62439a; }
@@ -145,10 +173,18 @@ button { cursor: pointer; }
 .event-meeting { background: #e5ddf4; color: #4d2480; }
 .event-testing { background: #dbeafe; color: #174d91; }
 .event-custom { background: #f5d2ce; color: #8a2921; }
+.day-number.event-school { --event-marker-color: #2f6fd6; }
+.day-number.event-administration { --event-marker-color: #7d5ac7; }
+.day-number.event-holiday { --event-marker-color: #db6b1f; }
+.day-number.event-break { --event-marker-color: #579b3d; }
+.day-number.event-meeting { --event-marker-color: #7d5ac7; }
+.day-number.event-testing { --event-marker-color: #2f6fd6; }
+.day-number.event-custom { --event-marker-color: #b84f4a; }
 .event-list-label { background: transparent !important; }
 .density-compact .months-grid { row-gap: .07in; }
-.density-compact .month-table td { height: 14px; }
-.density-compact .day-number { height: 13px; }
+.density-compact .month-table td { height: 15px; }
+.density-compact .day-number { height: 14px; }
+.density-compact .day-number.event-dot { --event-circle-size: 17px; }
 .density-compact .month-events { font-size: 7.3px; }
 .density-tight .calendar-header { min-height: .62in; margin-bottom: .1in; padding-bottom: .1in; }
 .density-tight .calendar-mark { width: 40px; height: 40px; font-size: 19px; }
@@ -158,7 +194,8 @@ button { cursor: pointer; }
 .density-tight .month-heading { margin-bottom: 2px; font-size: 9.5px; }
 .density-tight .month-table { font-size: 8px; }
 .density-tight .month-table th { font-size: 7px; }
-.density-tight .month-table td, .density-tight .day-number { height: 12px; }
+.density-tight .month-table td, .density-tight .day-number { height: 13px; }
+.density-tight .day-number.event-dot { --event-circle-size: 15px; }
 .density-tight .month-events { margin-top: 2px; gap: 0; font-size: 6.6px; }
 .density-tight .month-event { grid-template-columns: 55px minmax(0, 1fr); gap: 4px; }
 

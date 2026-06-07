@@ -5,14 +5,17 @@ export function holidaySuggestions(country, subdivision, firstDay, lastDay) {
   if (!country || !firstDay || !lastDay) return []
 
   const holidays = new Holidays(country, subdivision, { languages: ['en'] })
-  const firstYear = Number(firstDay.slice(0, 4))
-  const lastYear = Number(lastDay.slice(0, 4))
+  const suggestionStart = `${firstDay.slice(0, 7)}-01`
+  const [lastYear, lastMonth] = lastDay.split('-').map(Number)
+  const suggestionEnd = new Date(Date.UTC(lastYear, lastMonth, 0)).toISOString().slice(0, 10)
+  const firstYear = Number(suggestionStart.slice(0, 4))
+  const finalYear = Number(suggestionEnd.slice(0, 4))
   const results = []
 
-  for (let year = firstYear; year <= lastYear; year += 1) {
+  for (let year = firstYear; year <= finalYear; year += 1) {
     for (const holiday of holidays.getHolidays(year)) {
       const date = holiday.date.slice(0, 10)
-      if (date < firstDay || date > lastDay) continue
+      if (date < suggestionStart || date > suggestionEnd) continue
       if (!['public', 'bank', 'school'].includes(holiday.type)) continue
 
       results.push({

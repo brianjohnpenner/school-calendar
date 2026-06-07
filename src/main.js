@@ -4,7 +4,7 @@ import './style.css'
 import {
   STORAGE_KEY, categories, regions, defaultState, monthCount, createCalendar,
   calendarMonths, monthGrid, isoDate, eventsForMonth, eventsForDay, schoolYearLabel,
-  plainClone, uid, todayIso,
+  schoolDayStats, plainClone, uid, todayIso,
 } from './data.js'
 import { exportEnvelope, parseImport, mergeCalendars, downloadJson, shareJson } from './portability.js'
 
@@ -106,6 +106,7 @@ document.addEventListener('alpine:init', () => {
       return this.state.calendars.find((calendar) => calendar.id === this.state.activeCalendarId) ?? null
     },
     get months() { return calendarMonths(this.activeCalendar) },
+    get schoolDaySummary() { return schoolDayStats(this.activeCalendar) },
     get termMonthCount() { return monthCount(this.draft.firstDay, this.draft.lastDay) },
     get subdivisions() { return this.regions[this.draft.country]?.subdivisions ?? {} },
     get wizardValid() {

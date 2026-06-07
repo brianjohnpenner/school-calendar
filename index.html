@@ -115,7 +115,7 @@
           <div x-show="wizardStep === 4">
             <p class="text-sm font-semibold text-cyan-800">Step 4 of 4</p>
             <h1 class="mt-1 text-2xl font-semibold">Choose suggested holidays</h1>
-            <p class="mt-2 text-sm text-slate-600">These suggestions are editable after the calendar is created.</p>
+            <p class="mt-2 text-sm text-slate-600">Suggestions cover every displayed month, including dates before or after the school term. They are editable after creation.</p>
             <div class="mt-5 max-h-[420px] space-y-2 overflow-y-auto pr-1">
               <template x-for="holiday in suggestions" :key="holiday.suggestionId">
                 <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
@@ -153,35 +153,59 @@
         </div>
 
         <div class="grid items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[330px_minmax(0,1fr)]">
-          <aside class="panel overflow-hidden">
-            <div class="border-b border-slate-200 p-4">
-              <div class="flex items-center justify-between">
-                <h2 class="font-semibold">Events</h2>
-                <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600" x-text="(activeCalendar?.events.length ?? 0) + 2"></span>
+          <aside class="grid gap-4">
+            <section class="panel overflow-hidden">
+              <div class="flex items-start justify-between gap-4 border-b border-slate-200 p-4">
+                <div>
+                  <h2 class="font-semibold">School days</h2>
+                  <p class="mt-1 text-xs text-slate-500">Weekdays excluding holidays and breaks</p>
+                </div>
+                <strong class="text-3xl leading-none text-cyan-900" x-text="schoolDaySummary.total"></strong>
               </div>
-            </div>
-            <div class="max-h-[520px] divide-y divide-slate-100 overflow-y-auto">
-              <button class="block w-full p-4 text-left hover:bg-slate-50" @click="editWizardCalendar()">
-                <strong class="block text-sm text-blue-800">First Day of School</strong>
-                <span class="text-xs text-slate-500" x-text="activeCalendar ? formatDate(activeCalendar.term.firstDay) : ''"></span>
-              </button>
-              <template x-for="event in activeCalendar ? [...activeCalendar.events].sort((a,b) => a.startDate.localeCompare(b.startDate)) : []" :key="event.id">
-                <button class="block w-full p-4 text-left hover:bg-slate-50" @click="openEvent(event)">
-                  <strong class="event-list-label block truncate text-sm" :class="categories[event.category].className" x-text="event.title"></strong>
-                  <span class="text-xs text-slate-500" x-text="event.startDate === event.endDate ? formatDate(event.startDate) : `${formatDate(event.startDate)} – ${formatDate(event.endDate)}`"></span>
+              <div class="grid grid-cols-5 gap-px bg-slate-200">
+                <template x-for="month in schoolDaySummary.months" :key="`${month.year}-${month.month}`">
+                  <div class="bg-white px-2 py-2 text-center">
+                    <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500" x-text="month.label"></span>
+                    <strong class="mt-0.5 block text-sm text-slate-900" x-text="month.days"></strong>
+                  </div>
+                </template>
+              </div>
+              <div class="bg-slate-50 px-4 py-2.5 text-center text-xs font-medium text-slate-600">
+                Total includes <strong class="text-slate-900" x-text="schoolDaySummary.administrationDays"></strong>
+                administration <span x-text="schoolDaySummary.administrationDays === 1 ? 'day' : 'days'"></span>
+              </div>
+            </section>
+
+            <section class="panel overflow-hidden">
+              <div class="border-b border-slate-200 p-4">
+                <div class="flex items-center justify-between">
+                  <h2 class="font-semibold">Events</h2>
+                  <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600" x-text="(activeCalendar?.events.length ?? 0) + 2"></span>
+                </div>
+              </div>
+              <div class="max-h-[430px] divide-y divide-slate-100 overflow-y-auto">
+                <button class="block w-full p-4 text-left hover:bg-slate-50" @click="editWizardCalendar()">
+                  <strong class="block text-sm text-blue-800">First Day of School</strong>
+                  <span class="text-xs text-slate-500" x-text="activeCalendar ? formatDate(activeCalendar.term.firstDay) : ''"></span>
                 </button>
-              </template>
-              <button class="block w-full p-4 text-left hover:bg-slate-50" @click="editWizardCalendar()">
-                <strong class="block text-sm text-blue-800">Last Day of School</strong>
-                <span class="text-xs text-slate-500" x-text="activeCalendar ? formatDate(activeCalendar.term.lastDay) : ''"></span>
-              </button>
-            </div>
-            <div class="grid grid-cols-2 gap-2 border-t border-slate-200 p-3">
-              <button class="btn-quiet" @click="shareCurrent()">Share</button>
-              <button class="btn-quiet" @click="exportCurrent()">Download</button>
-              <button class="btn-quiet" @click="duplicateCalendar()">Duplicate</button>
-              <button class="btn-quiet text-red-700 hover:bg-red-50" @click="deleteCalendar()">Delete</button>
-            </div>
+                <template x-for="event in activeCalendar ? [...activeCalendar.events].sort((a,b) => a.startDate.localeCompare(b.startDate)) : []" :key="event.id">
+                  <button class="block w-full p-4 text-left hover:bg-slate-50" @click="openEvent(event)">
+                    <strong class="event-list-label block truncate text-sm" :class="categories[event.category].className" x-text="event.title"></strong>
+                    <span class="text-xs text-slate-500" x-text="event.startDate === event.endDate ? formatDate(event.startDate) : `${formatDate(event.startDate)} – ${formatDate(event.endDate)}`"></span>
+                  </button>
+                </template>
+                <button class="block w-full p-4 text-left hover:bg-slate-50" @click="editWizardCalendar()">
+                  <strong class="block text-sm text-blue-800">Last Day of School</strong>
+                  <span class="text-xs text-slate-500" x-text="activeCalendar ? formatDate(activeCalendar.term.lastDay) : ''"></span>
+                </button>
+              </div>
+              <div class="grid grid-cols-2 gap-2 border-t border-slate-200 p-3">
+                <button class="btn-quiet" @click="shareCurrent()">Share</button>
+                <button class="btn-quiet" @click="exportCurrent()">Download</button>
+                <button class="btn-quiet" @click="duplicateCalendar()">Duplicate</button>
+                <button class="btn-quiet text-red-700 hover:bg-red-50" @click="deleteCalendar()">Delete</button>
+              </div>
+            </section>
           </aside>
 
           <section class="calendar-preview-wrap rounded-2xl bg-slate-300/60 p-3 sm:p-6">
@@ -193,6 +217,7 @@
                     <h1 x-text="activeCalendar ? activeCalendar.schoolName : ''"></h1>
                     <div class="calendar-legend">
                       <span><i class="legend-dot legend-school"></i>School event</span>
+                      <span><i class="legend-dot legend-administration"></i>Admin day</span>
                       <span><i class="legend-ring legend-holiday"></i>Holiday</span>
                       <span><i class="legend-bar legend-break"></i>Break</span>
                     </div>

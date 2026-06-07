@@ -88,6 +88,7 @@ button { cursor: pointer; }
 .legend-ring { border: 2px solid; border-radius: 999px; }
 .legend-bar { height: 6px !important; border-radius: 999px; }
 .legend-school { background: #2f6fd6; }
+.legend-administration { background: #7d5ac7; }
 .legend-holiday { border-color: #db6b1f; }
 .legend-break { background: #bfe1c6; }
 .calendar-year { flex: 0 0 auto; text-align: right; }
@@ -138,6 +139,7 @@ button { cursor: pointer; }
 .month-event-date { overflow: hidden; color: var(--month-accent); font-weight: 800; text-align: right; text-overflow: ellipsis; }
 .month-event-title { overflow: hidden; text-overflow: ellipsis; }
 .event-school { background: #cfe4f5; color: #07539a; }
+.event-administration { background: #e8e3f5; color: #62439a; }
 .event-holiday { background: #f7dfc2; color: #9a4a00; }
 .event-break { background: #d5e9ca; color: #2f6d1d; }
 .event-meeting { background: #e5ddf4; color: #4d2480; }

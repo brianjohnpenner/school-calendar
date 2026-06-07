@@ -4,6 +4,7 @@ export const FORMAT_VERSION = 1
 
 export const categories = {
   school: { label: 'School day', className: 'event-school' },
+  administration: { label: 'Administration day', className: 'event-administration' },
   holiday: { label: 'Holiday', className: 'event-holiday' },
   break: { label: 'Break', className: 'event-break' },
   meeting: { label: 'Meeting', className: 'event-meeting' },
@@ -147,4 +148,44 @@ export function schoolYearLabel(calendar) {
   const start = calendar.term.firstDay.slice(0, 4)
   const end = calendar.term.lastDay.slice(0, 4)
   return start === end ? start : `${start} – ${end}`
+}
+
+export function schoolDayStats(calendar) {
+  if (!calendar) return { months: [], total: 0, administrationDays: 0 }
+
+  const months = calendarMonths(calendar).map(({ year, month }) => ({
+    year,
+    month,
+    label: new Intl.DateTimeFormat('en', { month: 'short', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(year, month - 1, 1))),
+    days: 0,
+  }))
+  const monthLookup = new Map(months.map((item) => [`${item.year}-${item.month}`, item]))
+  const noSchoolEvents = calendar.events.filter((event) => ['holiday', 'break'].includes(event.category))
+  const administrationEvents = calendar.events.filter((event) => event.category === 'administration')
+  let total = 0
+  let administrationDays = 0
+
+  for (
+    let date = new Date(`${calendar.term.firstDay}T00:00:00Z`);
+    isoFromUtcDate(date) <= calendar.term.lastDay;
+    date.setUTCDate(date.getUTCDate() + 1)
+  ) {
+    const iso = isoFromUtcDate(date)
+    const weekday = date.getUTCDay()
+    if (weekday === 0 || weekday === 6) continue
+    if (noSchoolEvents.some((event) => event.startDate <= iso && event.endDate >= iso)) continue
+
+    monthLookup.get(`${date.getUTCFullYear()}-${date.getUTCMonth() + 1}`).days += 1
+    total += 1
+    if (administrationEvents.some((event) => event.startDate <= iso && event.endDate >= iso)) {
+      administrationDays += 1
+    }
+  }
+
+  return { months, total, administrationDays }
+}
+
+function isoFromUtcDate(date) {
+  return date.toISOString().slice(0, 10)
 }

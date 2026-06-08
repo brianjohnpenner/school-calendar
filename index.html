@@ -208,8 +208,25 @@
             </section>
           </aside>
 
-          <section class="calendar-preview-wrap rounded-2xl bg-slate-300/60 p-3 sm:p-6">
-            <article id="print-sheet" class="calendar-sheet" :class="printDensityClass" :style="{ '--month-rows': monthRowCount }">
+          <section class="min-w-0 rounded-2xl bg-slate-300/60 p-3 sm:p-6">
+            <div class="mb-3 flex items-center justify-end gap-1 rounded-xl bg-white/80 p-1.5 shadow-sm">
+              <button class="btn-quiet size-10 p-0 text-lg" type="button" aria-label="Zoom out" :disabled="previewScale <= .25" @click="zoomPreview(-.1)">−</button>
+              <button class="btn-quiet min-w-20" type="button" @click="fitPreview()">Fit <span class="ml-1 text-xs text-slate-500" x-text="`${Math.round(previewScale * 100)}%`"></span></button>
+              <button class="btn-quiet size-10 p-0 text-lg" type="button" aria-label="Zoom in" :disabled="previewScale >= 1.5" @click="zoomPreview(.1)">+</button>
+            </div>
+            <div
+              class="calendar-preview-wrap"
+              :class="{ 'is-zoomed': previewScale > previewFitScale + .001 }"
+              x-ref="previewViewport"
+              x-init="initializePreview($el)"
+            >
+              <div class="calendar-sheet-stage" :style="{ width: `${8.5 * previewScale}in`, minHeight: `${11 * previewScale}in` }">
+                <article
+                  id="print-sheet"
+                  class="calendar-sheet"
+                  :class="printDensityClass"
+                  :style="{ '--month-rows': monthRowCount, transform: `scale(${previewScale})` }"
+                >
               <header class="calendar-header">
                 <div class="calendar-identity">
                   <span class="calendar-mark" aria-hidden="true">★</span>
@@ -262,7 +279,9 @@
                   </section>
                 </template>
               </div>
-            </article>
+                </article>
+              </div>
+            </div>
           </section>
         </div>
       </main>

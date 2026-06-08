@@ -89,6 +89,10 @@ document.addEventListener('alpine:init', () => {
     importPreviews: [],
     loadingHolidays: false,
     notice: '',
+    previewScale: 1,
+    previewFitScale: 1,
+    previewMode: 'fit',
+    previewResizeObserver: null,
     categories,
     regions,
     weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
@@ -148,6 +152,39 @@ document.addEventListener('alpine:init', () => {
     },
     formatDate(date) {
       return formatFullDate(date)
+    },
+    initializePreview(element) {
+      this.previewResizeObserver?.disconnect()
+      this.previewResizeObserver = new ResizeObserver(() => this.updatePreviewFit())
+      this.previewResizeObserver.observe(element)
+      this.$nextTick(() => this.fitPreview())
+    },
+    updatePreviewFit() {
+      const viewport = this.$refs.previewViewport
+      if (!viewport?.clientWidth) return
+      this.previewFitScale = Math.min(1, viewport.clientWidth / (8.5 * 96))
+      if (this.previewMode === 'fit') {
+        this.previewScale = this.previewFitScale
+        viewport.scrollTo({ top: 0, left: 0 })
+      }
+    },
+    fitPreview() {
+      this.previewMode = 'fit'
+      this.updatePreviewFit()
+    },
+    zoomPreview(amount) {
+      this.previewMode = 'custom'
+      const viewport = this.$refs.previewViewport
+      const oldWidth = 8.5 * 96 * this.previewScale
+      const centerRatio = viewport && oldWidth > 0
+        ? (viewport.scrollLeft + viewport.clientWidth / 2) / oldWidth
+        : .5
+      this.previewScale = Math.min(1.5, Math.max(.25, this.previewScale + amount))
+      this.$nextTick(() => {
+        if (!viewport) return
+        const newWidth = 8.5 * 96 * this.previewScale
+        viewport.scrollLeft = Math.max(0, centerRatio * newWidth - viewport.clientWidth / 2)
+      })
     },
 
     startWizard() {

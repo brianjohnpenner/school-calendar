@@ -144,10 +144,14 @@ button { cursor: pointer; }
 }
 .day-number.event-dot {
   --event-circle-size: 19px;
+  font-weight: 800;
+}
+/* A single-day event inside a multi-day band keeps the band's cell width; its
+   circle marker is drawn by the ::before, so it shouldn't resize the cell. */
+.day-number.event-dot:not(.event-range) {
   width: var(--event-circle-size);
   height: var(--event-circle-size);
   margin: 0 auto;
-  font-weight: 800;
 }
 .day-number.event-dot::before {
   position: absolute;

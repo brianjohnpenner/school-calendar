@@ -1,6 +1,6 @@
 # School Calendar Generator
 
-A browser-only school calendar editor built with Vite, AlpineJS, Tailwind CSS, and `date-holidays`.
+A browser-only school calendar editor built with Vite, Svelte 5, Tailwind CSS, and `date-holidays`.
 
 ## Development
 
@@ -15,7 +15,7 @@ Create a production build with:
 npm run build
 ```
 
-Calendar data is stored in the current browser through Alpine Persist. Use the CSV download and import tools to move individual calendars between browsers.
+Calendar data is stored in the current browser's `localStorage`. Use the CSV download and import tools to move individual calendars between browsers.
 
 ## Cloudflare
 

@@ -424,6 +424,20 @@ document.addEventListener('alpine:init', () => {
       }
       this.eventDialogOpen = true
     },
+    // Tap or click a day in the preview to add an event on that date. If the day
+    // already has a single-day event, open it for editing instead.
+    selectDay(date) {
+      const calendar = this.activeCalendar
+      if (!calendar || !date) return
+      const index = calendar.events.findIndex((event) =>
+        event.startDate === event.endDate && event.startDate === date)
+      if (index !== -1) {
+        this.openEvent({ ...calendar.events[index], index })
+        return
+      }
+      this.eventForm = { ...blankEvent(), startDate: date, endDate: date }
+      this.eventDialogOpen = true
+    },
     saveEvent() {
       if (!this.eventForm.title.trim() || this.eventForm.startDate > this.eventForm.endDate) return
       const calendar = this.activeCalendar

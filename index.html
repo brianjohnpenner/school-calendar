@@ -266,9 +266,15 @@
                         <template x-for="(week, weekIndex) in month.weeks" :key="`${month.key}-${weekIndex}`">
                           <tr>
                             <template x-for="(day, dayIndex) in week" :key="day?.date ?? `${month.key}-${weekIndex}-${dayIndex}`">
-                              <td :class="{ 'weekend': dayIndex === 0 || dayIndex === 6 }">
+                              <td :class="{ 'weekend': dayIndex === 0 || dayIndex === 6, 'day-clickable': day && activeCalendar }">
                                 <template x-if="day">
-                                  <span class="day-number" :class="day.classes" x-text="day.number"></span>
+                                  <span class="day-number" :class="day.classes" x-text="day.number"
+                                    :role="activeCalendar ? 'button' : null"
+                                    :tabindex="activeCalendar ? 0 : null"
+                                    :aria-label="activeCalendar ? `Add event on ${formatDate(day.date)}` : null"
+                                    @click="activeCalendar && selectDay(day.date)"
+                                    @keydown.enter.prevent="activeCalendar && selectDay(day.date)"
+                                    @keydown.space.prevent="activeCalendar && selectDay(day.date)"></span>
                                 </template>
                               </td>
                             </template>

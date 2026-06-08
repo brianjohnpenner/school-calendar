@@ -1,4 +1,4 @@
-import { categories, monthCount } from './data.js'
+import { categories, migrateCategory, monthCount } from './data.js'
 
 const CSV_HEADER = ['type', 'name', 'start_date', 'end_date', 'category']
 
@@ -131,7 +131,7 @@ export function parseImport(text) {
       title: record.name,
       startDate: record.startDate,
       endDate: record.endDate,
-      category: record.category,
+      category: migrateCategory(record.category),
     })),
   }
   return [{ calendar, selected: true, errors: validateCalendar(calendar) }]

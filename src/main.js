@@ -2,8 +2,9 @@ import Alpine from 'alpinejs'
 import persist from '@alpinejs/persist'
 import './style.css'
 import {
-  STORAGE_KEY, categories, regions, defaultState, monthCount, createCalendar,
-  calendarMonths, schoolDayStats, plainClone, uid, todayIso,
+  STORAGE_KEY, categories, eventCategories, migrateCategory, regions, defaultState,
+  monthCount, createCalendar, calendarMonths, schoolDayStats, splitIntoSemesters,
+  plainClone, uid, todayIso,
 } from './data.js'
 import { buildMonthView, formatFullDate } from './calendar-view.js'
 import { exportCalendarCsv, parseImport, downloadCsv, shareCsv } from './portability.js'
@@ -17,13 +18,31 @@ function blankDraft() {
     schoolName: '',
     firstDay: `${year}-09-01`,
     lastDay: `${year + 1}-06-30`,
+    semesterCount: 2,
     country: 'CA',
     subdivision: 'ON',
   }
 }
 
 function blankEvent() {
-  return { index: null, title: '', startDate: todayIso(), endDate: todayIso(), category: 'custom' }
+  return { index: null, title: '', startDate: todayIso(), endDate: todayIso(), category: 'event' }
+}
+
+const STORAGE_NOTICE_KEY = 'school-calendar-generator:storage-notice'
+
+function validIso(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value ?? '')
+}
+
+// Keep the live wizard preview sane while the user is still editing dates.
+function previewRange(firstDay, lastDay) {
+  const start = validIso(firstDay) ? firstDay : blankDraft().firstDay
+  if (validIso(lastDay) && lastDay >= start && monthCount(start, lastDay) <= 14) {
+    return { firstDay: start, lastDay }
+  }
+  const [year, month, day] = start.split('-').map(Number)
+  const end = new Date(Date.UTC(year, month - 1 + 9, day))
+  return { firstDay: start, lastDay: end.toISOString().slice(0, 10) }
 }
 
 function isoFromDate(date) {
@@ -37,6 +56,14 @@ function dateInRange(date, firstDay, lastDay) {
 function defaultBreakSuggestions(firstDay, lastDay) {
   const firstYear = Number(firstDay.slice(0, 4))
   const lastYear = Number(lastDay.slice(0, 4))
+  // Last Thursday of October, plus the Friday that follows it.
+  const octoberEnd = new Date(Date.UTC(firstYear, 9, 31))
+  const meetingThursday = new Date(octoberEnd)
+  meetingThursday.setUTCDate(31 - ((octoberEnd.getUTCDay() - 4 + 7) % 7))
+  const meetingFriday = new Date(meetingThursday)
+  meetingFriday.setUTCDate(meetingThursday.getUTCDate() + 1)
+  const meetingStart = isoFromDate(meetingThursday)
+  const meetingEnd = isoFromDate(meetingFriday)
   const christmasStart = `${firstYear}-12-22`
   const christmasEnd = `${firstYear + 1}-01-02`
   const marchFirst = new Date(Date.UTC(lastYear, 2, 1))
@@ -50,11 +77,19 @@ function defaultBreakSuggestions(firstDay, lastDay) {
   return [
     {
       suggestionId: uid('break'),
+      title: 'School Meeting',
+      startDate: meetingStart < firstDay ? firstDay : meetingStart,
+      endDate: meetingEnd > lastDay ? lastDay : meetingEnd,
+      enabled: meetingStart <= lastDay && meetingEnd >= firstDay,
+      category: 'holiday',
+    },
+    {
+      suggestionId: uid('break'),
       title: 'Christmas Vacation',
       startDate: christmasStart < firstDay ? firstDay : christmasStart,
       endDate: christmasEnd > lastDay ? lastDay : christmasEnd,
       enabled: christmasStart <= lastDay && christmasEnd >= firstDay,
-      category: 'break',
+      category: 'holiday',
     },
     {
       suggestionId: uid('break'),
@@ -62,7 +97,7 @@ function defaultBreakSuggestions(firstDay, lastDay) {
       startDate: springStart < firstDay ? firstDay : springStart,
       endDate: springEnd > lastDay ? lastDay : springEnd,
       enabled: springStart <= lastDay && springEnd >= firstDay,
-      category: 'break',
+      category: 'holiday',
     },
   ]
 }
@@ -73,7 +108,6 @@ document.addEventListener('alpine:init', () => {
   })
 
   Alpine.data('calendarApp', () => ({
-    view: 'home',
     wizardStep: 1,
     draft: blankDraft(),
     breakSuggestions: [],
@@ -86,6 +120,7 @@ document.addEventListener('alpine:init', () => {
     importError: '',
     importPreviews: [],
     loadingHolidays: false,
+    storageNoticeOpen: false,
     notice: '',
     previewScale: 1,
     previewFitScale: 1,
@@ -94,26 +129,69 @@ document.addEventListener('alpine:init', () => {
     previewPinch: null,
     previewTouchHandlers: null,
     categories,
+    eventCategories,
     regions,
     weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
 
     init() {
-      const state = this.$store.calendarData.state
-      if (!state || !Array.isArray(state.calendars)) {
-        this.$store.calendarData.state = defaultState()
+      const store = this.$store.calendarData
+      const state = store.state
+      if (!state || typeof state !== 'object') {
+        store.state = defaultState()
+      } else if (Array.isArray(state.calendars)) {
+        // Migrate the legacy multi-calendar shape to a single calendar.
+        const active = typeof state.activeCalendar === 'number' ? state.activeCalendar : 0
+        store.state = {
+          country: state.country ?? 'CA',
+          subdivision: state.subdivision ?? 'ON',
+          calendar: state.calendars[active] ?? state.calendars[0] ?? null,
+        }
       }
-      if (this.activeCalendar) this.view = 'editor'
+      // Fold any retired event categories onto the current set.
+      if (this.activeCalendar?.events) {
+        this.activeCalendar.events.forEach((event) => {
+          event.category = migrateCategory(event.category)
+        })
+      }
+      if (!this.activeCalendar) this.resetWizard()
+      try {
+        if (!localStorage.getItem(STORAGE_NOTICE_KEY)) this.storageNoticeOpen = true
+      } catch { /* storage unavailable */ }
     },
 
     get state() { return this.$store.calendarData.state },
     get activeCalendar() {
-      return this.state.calendars[this.state.activeCalendar] ?? null
+      return this.state.calendar ?? null
+    },
+    // The saved calendar, or a live preview built from the in-progress wizard draft.
+    get previewCalendar() {
+      return this.activeCalendar ?? this.draftCalendar()
+    },
+    draftCalendar() {
+      const range = previewRange(this.draft.firstDay, this.draft.lastDay)
+      const selected = [
+        ...this.breakSuggestions.filter((item) => item.enabled),
+        ...this.suggestions.filter((item) => this.selectedSuggestions.includes(item.suggestionId)),
+      ]
+      return {
+        name: this.draft.name.trim() || 'Untitled calendar',
+        schoolName: this.draft.schoolName.trim() || 'Your School Name',
+        firstDay: range.firstDay,
+        lastDay: range.lastDay,
+        semesterCount: this.draft.semesterCount ?? 2,
+        events: selected.map(({ title, startDate, endDate, category }) =>
+          ({ title, startDate, endDate, category })),
+      }
     },
     get months() {
-      return calendarMonths(this.activeCalendar)
-        .map((month, index) => buildMonthView(this.activeCalendar, month, index))
+      return calendarMonths(this.previewCalendar)
+        .map((month, index) => buildMonthView(this.previewCalendar, month, index))
     },
-    get schoolDaySummary() { return schoolDayStats(this.activeCalendar) },
+    get schoolDaySummary() { return schoolDayStats(this.previewCalendar) },
+    get semesterSplits() {
+      const calendar = this.previewCalendar
+      return splitIntoSemesters(calendar, calendar.semesterCount ?? this.draft.semesterCount ?? 2)
+    },
     get sortedEvents() {
       return this.activeCalendar
         ? this.activeCalendar.events
@@ -122,7 +200,7 @@ document.addEventListener('alpine:init', () => {
         : []
     },
     get eventCount() { return (this.activeCalendar?.events.length ?? 0) + 2 },
-    get monthRowCount() { return Math.ceil(calendarMonths(this.activeCalendar).length / 2) },
+    get monthRowCount() { return Math.ceil(calendarMonths(this.previewCalendar).length / 2) },
     get termMonthCount() { return monthCount(this.draft.firstDay, this.draft.lastDay) },
     get subdivisions() { return this.regions[this.draft.country]?.subdivisions ?? {} },
     get wizardValid() {
@@ -139,18 +217,16 @@ document.addEventListener('alpine:init', () => {
       )
     },
     get printDensityClass() {
-      const count = calendarMonths(this.activeCalendar).length
-      const eventCount = this.activeCalendar?.events.length ?? 0
+      const count = calendarMonths(this.previewCalendar).length
+      const eventCount = this.previewCalendar.events.length
       if (count >= 12 || eventCount > 28) return 'density-tight'
       if (count >= 11 || eventCount > 18) return 'density-compact'
       return 'density-comfortable'
     },
 
     get shortSchoolYearLabel() {
-      if (!this.activeCalendar) return ''
-      const start = this.activeCalendar.firstDay.slice(0, 4)
-      const end = this.activeCalendar.lastDay.slice(2, 4)
-      return `${start}–${end}`
+      const calendar = this.previewCalendar
+      return `${calendar.firstDay.slice(0, 4)}–${calendar.lastDay.slice(2, 4)}`
     },
     formatDate(date) {
       return formatFullDate(date)
@@ -261,7 +337,7 @@ document.addEventListener('alpine:init', () => {
       })
     },
 
-    startWizard() {
+    resetWizard() {
       this.draft = {
         ...blankDraft(),
         country: this.state.country,
@@ -271,7 +347,6 @@ document.addEventListener('alpine:init', () => {
       this.breakSuggestions = []
       this.suggestions = []
       this.selectedSuggestions = []
-      this.view = 'wizard'
     },
     editWizardCalendar() {
       const calendar = this.activeCalendar
@@ -280,6 +355,7 @@ document.addEventListener('alpine:init', () => {
         schoolName: calendar.schoolName,
         firstDay: calendar.firstDay,
         lastDay: calendar.lastDay,
+        semesterCount: calendar.semesterCount ?? 2,
         country: this.state.country,
         subdivision: this.state.subdivision,
       }
@@ -315,12 +391,9 @@ document.addEventListener('alpine:init', () => {
       const selectedHolidays = this.suggestions
         .filter((item) => this.selectedSuggestions.includes(item.suggestionId))
       const selected = [...selectedBreaks, ...selectedHolidays]
-      const calendar = createCalendar(this.draft, selected)
-      this.state.calendars.push(calendar)
-      this.state.activeCalendar = this.state.calendars.length - 1
+      this.state.calendar = createCalendar(this.draft, selected)
       this.state.country = this.draft.country
       this.state.subdivision = this.draft.subdivision
-      this.view = 'editor'
       this.flash('Calendar created.')
     },
     saveSettings() {
@@ -331,28 +404,17 @@ document.addEventListener('alpine:init', () => {
         schoolName: this.draft.schoolName.trim(),
         firstDay: this.draft.firstDay,
         lastDay: this.draft.lastDay,
+        semesterCount: this.draft.semesterCount ?? 2,
       })
       this.state.country = this.draft.country
       this.state.subdivision = this.draft.subdivision
       this.settingsOpen = false
       this.flash('Calendar settings saved.')
     },
-    selectCalendar(index) {
-      this.state.activeCalendar = Number(index)
-      this.view = 'editor'
-    },
-    duplicateCalendar() {
-      const copy = plainClone(this.activeCalendar)
-      copy.name = `${copy.name} Copy`
-      this.state.calendars.push(copy)
-      this.state.activeCalendar = this.state.calendars.length - 1
-      this.flash('Calendar duplicated.')
-    },
     deleteCalendar() {
       if (!confirm(`Delete “${this.activeCalendar.name}”? This cannot be undone.`)) return
-      this.state.calendars.splice(this.state.activeCalendar, 1)
-      this.state.activeCalendar = this.state.calendars.length ? 0 : null
-      this.view = this.activeCalendar ? 'editor' : 'home'
+      this.state.calendar = null
+      this.resetWizard()
     },
     openEvent(event = null) {
       this.eventForm = event ? plainClone(event) : {
@@ -412,16 +474,19 @@ document.addEventListener('alpine:init', () => {
       this.readImport(event.dataTransfer.files[0])
     },
     confirmImport() {
-      const valid = this.importPreviews
-        .filter((preview) => preview.selected && preview.errors.length === 0)
-        .map((preview) => preview.calendar)
-      if (!valid.length) return
-      this.state.calendars.push(...valid)
-      this.state.activeCalendar = this.state.calendars.length - valid.length
+      const calendar = this.importPreviews
+        .find((preview) => preview.selected && preview.errors.length === 0)?.calendar
+      if (!calendar) return
+      if (this.activeCalendar &&
+        !confirm('Importing will replace your current calendar. Continue?')) return
+      this.state.calendar = calendar
       this.importOpen = false
       this.importPreviews = []
-      this.view = 'editor'
-      this.flash(`${imported.length} calendar${imported.length === 1 ? '' : 's'} imported.`)
+      this.flash('Calendar imported.')
+    },
+    dismissStorageNotice() {
+      this.storageNoticeOpen = false
+      try { localStorage.setItem(STORAGE_NOTICE_KEY, '1') } catch { /* storage unavailable */ }
     },
     printCalendar() { window.print() },
     slug(value) {

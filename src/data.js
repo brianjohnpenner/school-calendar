@@ -2,12 +2,44 @@ export const STORAGE_KEY = 'school-calendar-generator:v2'
 
 export const categories = {
   school: { label: 'School day', className: 'event-school' },
-  administration: { label: 'Administration day', className: 'event-administration' },
-  holiday: { label: 'Holiday', className: 'event-holiday' },
-  break: { label: 'Break', className: 'event-break' },
-  meeting: { label: 'Meeting', className: 'event-meeting' },
-  testing: { label: 'Testing', className: 'event-testing' },
-  custom: { label: 'Custom', className: 'event-custom' },
+  holiday: {
+    label: 'Holiday',
+    className: 'event-holiday',
+    description: 'A day off — not counted as a school day. Use it any time, even outside the school year or during a break.',
+  },
+  halfday: {
+    label: 'Half day holiday',
+    className: 'event-halfday',
+    description: 'A half day off. Still counts as a school day.',
+  },
+  event: {
+    label: 'Event',
+    className: 'event-custom',
+    description: 'Something happens that day but it is not a day off. Still counts as a school day.',
+  },
+}
+
+// User-selectable categories for the event editor. `school` is reserved for the
+// system First/Last Day markers and is not offered as a choice.
+export const eventCategories = {
+  holiday: categories.holiday,
+  halfday: categories.halfday,
+  event: categories.event,
+}
+
+// Map retired categories onto the current set (used when loading saved or
+// imported calendars). Breaks become holidays; everything else that merely
+// marked a normal day becomes a generic event.
+const CATEGORY_MIGRATION = {
+  break: 'holiday',
+  administration: 'event',
+  meeting: 'event',
+  testing: 'event',
+  custom: 'event',
+}
+
+export function migrateCategory(category) {
+  return CATEGORY_MIGRATION[category] ?? category
 }
 
 export const regions = {
@@ -52,10 +84,9 @@ export function todayIso() {
 
 export function defaultState() {
   return {
-    activeCalendar: null,
     country: 'CA',
     subdivision: 'ON',
-    calendars: [],
+    calendar: null,
   }
 }
 
@@ -72,6 +103,7 @@ export function createCalendar(draft, selectedHolidays = []) {
     schoolName: draft.schoolName.trim(),
     firstDay: draft.firstDay,
     lastDay: draft.lastDay,
+    semesterCount: draft.semesterCount ?? 2,
     events: selectedHolidays.map(({ title, startDate, endDate, category }) => ({
       title,
       startDate,
@@ -141,22 +173,10 @@ export function schoolYearLabel(calendar) {
   return start === end ? start : `${start} – ${end}`
 }
 
-export function schoolDayStats(calendar) {
-  if (!calendar) return { months: [], total: 0, administrationDays: 0 }
-
-  const months = calendarMonths(calendar).map(({ year, month }) => ({
-    year,
-    month,
-    label: new Intl.DateTimeFormat('en', { month: 'short', timeZone: 'UTC' })
-      .format(new Date(Date.UTC(year, month - 1, 1))),
-    days: 0,
-  }))
-  const monthLookup = new Map(months.map((item) => [`${item.year}-${item.month}`, item]))
-  const noSchoolEvents = calendar.events.filter((event) => ['holiday', 'break'].includes(event.category))
-  const administrationEvents = calendar.events.filter((event) => event.category === 'administration')
-  let total = 0
-  let administrationDays = 0
-
+export function schoolDayDates(calendar) {
+  if (!calendar) return []
+  const noSchoolEvents = calendar.events.filter((event) => event.category === 'holiday')
+  const dates = []
   for (
     let date = new Date(`${calendar.firstDay}T00:00:00Z`);
     isoFromUtcDate(date) <= calendar.lastDay;
@@ -166,15 +186,45 @@ export function schoolDayStats(calendar) {
     const weekday = date.getUTCDay()
     if (weekday === 0 || weekday === 6) continue
     if (noSchoolEvents.some((event) => event.startDate <= iso && event.endDate >= iso)) continue
+    dates.push(iso)
+  }
+  return dates
+}
 
-    monthLookup.get(`${date.getUTCFullYear()}-${date.getUTCMonth() + 1}`).days += 1
-    total += 1
-    if (administrationEvents.some((event) => event.startDate <= iso && event.endDate >= iso)) {
-      administrationDays += 1
+export function splitIntoSemesters(calendar, count) {
+  const days = schoolDayDates(calendar)
+  if (!days.length) return []
+  return Array.from({ length: count }, (_, i) => {
+    const startIdx = Math.round((days.length * i) / count)
+    const endIdx = Math.round((days.length * (i + 1)) / count) - 1
+    return {
+      label: `Semester ${i + 1}`,
+      startDate: days[startIdx],
+      endDate: days[endIdx],
+      schoolDays: endIdx - startIdx + 1,
     }
+  })
+}
+
+export function schoolDayStats(calendar) {
+  if (!calendar) return { months: [], total: 0 }
+
+  const months = calendarMonths(calendar).map(({ year, month }) => ({
+    year,
+    month,
+    label: new Intl.DateTimeFormat('en', { month: 'short', timeZone: 'UTC' })
+      .format(new Date(Date.UTC(year, month - 1, 1))),
+    days: 0,
+  }))
+  const monthLookup = new Map(months.map((item) => [`${item.year}-${item.month}`, item]))
+
+  const schoolDays = schoolDayDates(calendar)
+  for (const iso of schoolDays) {
+    const [year, month] = iso.split('-').map(Number)
+    monthLookup.get(`${year}-${month}`).days += 1
   }
 
-  return { months, total, administrationDays }
+  return { months, total: schoolDays.length }
 }
 
 function isoFromUtcDate(date) {

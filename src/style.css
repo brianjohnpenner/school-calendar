@@ -161,11 +161,11 @@ button { cursor: pointer; }
   background: var(--event-marker-color);
 }
 .day-number.event-half {
-  --event-marker-color: var(--month-fill);
-  color: #17233f;
+  --event-marker-color: var(--month-accent);
+  color: var(--event-marker-color);
 }
 .day-number.event-half::before {
-  background: linear-gradient(90deg, var(--event-marker-color) 50%, white 50%);
+  background: linear-gradient(90deg, var(--month-band) 50%, white 50%);
 }
 .day-number.event-range {
   --event-range-background: var(--month-band);

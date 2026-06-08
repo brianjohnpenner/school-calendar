@@ -10,7 +10,7 @@ export const categories = {
   halfday: {
     label: 'Half day holiday',
     className: 'event-halfday',
-    description: 'A half day off. Still counts as a school day.',
+    description: 'A half day off. Counts as half a school day.',
   },
   event: {
     label: 'Event',
@@ -173,9 +173,12 @@ export function schoolYearLabel(calendar) {
   return start === end ? start : `${start} – ${end}`
 }
 
+// Returns each in-session school day as `{ iso, weight }`. A half day counts as
+// 0.5 of a school day; a full day counts as 1. Holidays are excluded entirely.
 export function schoolDayDates(calendar) {
   if (!calendar) return []
   const noSchoolEvents = calendar.events.filter((event) => event.category === 'holiday')
+  const halfDayEvents = calendar.events.filter((event) => event.category === 'halfday')
   const dates = []
   for (
     let date = new Date(`${calendar.firstDay}T00:00:00Z`);
@@ -186,7 +189,8 @@ export function schoolDayDates(calendar) {
     const weekday = date.getUTCDay()
     if (weekday === 0 || weekday === 6) continue
     if (noSchoolEvents.some((event) => event.startDate <= iso && event.endDate >= iso)) continue
-    dates.push(iso)
+    const isHalfDay = halfDayEvents.some((event) => event.startDate <= iso && event.endDate >= iso)
+    dates.push({ iso, weight: isHalfDay ? 0.5 : 1 })
   }
   return dates
 }
@@ -197,11 +201,14 @@ export function splitIntoSemesters(calendar, count) {
   return Array.from({ length: count }, (_, i) => {
     const startIdx = Math.round((days.length * i) / count)
     const endIdx = Math.round((days.length * (i + 1)) / count) - 1
+    const schoolDays = days
+      .slice(startIdx, endIdx + 1)
+      .reduce((sum, day) => sum + day.weight, 0)
     return {
       label: `Semester ${i + 1}`,
-      startDate: days[startIdx],
-      endDate: days[endIdx],
-      schoolDays: endIdx - startIdx + 1,
+      startDate: days[startIdx].iso,
+      endDate: days[endIdx].iso,
+      schoolDays,
     }
   })
 }
@@ -219,12 +226,14 @@ export function schoolDayStats(calendar) {
   const monthLookup = new Map(months.map((item) => [`${item.year}-${item.month}`, item]))
 
   const schoolDays = schoolDayDates(calendar)
-  for (const iso of schoolDays) {
+  let total = 0
+  for (const { iso, weight } of schoolDays) {
     const [year, month] = iso.split('-').map(Number)
-    monthLookup.get(`${year}-${month}`).days += 1
+    monthLookup.get(`${year}-${month}`).days += weight
+    total += weight
   }
 
-  return { months, total: schoolDays.length }
+  return { months, total }
 }
 
 function isoFromUtcDate(date) {

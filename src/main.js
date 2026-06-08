@@ -93,6 +93,8 @@ document.addEventListener('alpine:init', () => {
     previewFitScale: 1,
     previewMode: 'fit',
     previewResizeObserver: null,
+    previewPinch: null,
+    previewTouchHandlers: null,
     categories,
     regions,
     weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
@@ -157,7 +159,79 @@ document.addEventListener('alpine:init', () => {
       this.previewResizeObserver?.disconnect()
       this.previewResizeObserver = new ResizeObserver(() => this.updatePreviewFit())
       this.previewResizeObserver.observe(element)
+      this.previewTouchHandlers?.forEach(([name, handler]) =>
+        element.removeEventListener(name, handler)
+      )
+      this.previewTouchHandlers = [
+        ['touchstart', (event) => this.startPreviewPinch(event)],
+        ['touchmove', (event) => this.movePreviewPinch(event)],
+        ['touchend', (event) => this.endPreviewPinch(event)],
+        ['touchcancel', (event) => this.endPreviewPinch(event)],
+      ]
+      this.previewTouchHandlers.forEach(([name, handler]) =>
+        element.addEventListener(name, handler, { passive: false })
+      )
       this.$nextTick(() => this.fitPreview())
+    },
+    previewTouchDistance(touches) {
+      return Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY
+      )
+    },
+    previewTouchMidpoint(touches) {
+      return {
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2,
+      }
+    },
+    startPreviewPinch(event) {
+      if (event.touches.length !== 2) return
+      const viewport = this.$refs.previewViewport
+      const stage = viewport?.querySelector('.calendar-sheet-stage')
+      if (!viewport || !stage) return
+
+      event.preventDefault()
+      const midpoint = this.previewTouchMidpoint(event.touches)
+      const stageRect = stage.getBoundingClientRect()
+      this.previewMode = 'custom'
+      this.previewPinch = {
+        distance: this.previewTouchDistance(event.touches),
+        scale: this.previewScale,
+        pageX: (midpoint.x - stageRect.left) / this.previewScale,
+        pageY: (midpoint.y - stageRect.top) / this.previewScale,
+      }
+    },
+    movePreviewPinch(event) {
+      if (!this.previewPinch || event.touches.length !== 2) return
+      event.preventDefault()
+      const viewport = this.$refs.previewViewport
+      const distance = this.previewTouchDistance(event.touches)
+      if (!viewport || !distance || !this.previewPinch.distance) return
+
+      const midpoint = this.previewTouchMidpoint(event.touches)
+      const viewportRect = viewport.getBoundingClientRect()
+      const pinch = this.previewPinch
+      const nextScale = Math.min(
+        1.5,
+        Math.max(.25, pinch.scale * distance / pinch.distance)
+      )
+      this.previewScale = nextScale
+      this.$nextTick(() => {
+        const stage = viewport.querySelector('.calendar-sheet-stage')
+        if (!stage) return
+        viewport.scrollLeft = Math.max(
+          0,
+          stage.offsetLeft + pinch.pageX * nextScale - (midpoint.x - viewportRect.left)
+        )
+        viewport.scrollTop = Math.max(
+          0,
+          stage.offsetTop + pinch.pageY * nextScale - (midpoint.y - viewportRect.top)
+        )
+      })
+    },
+    endPreviewPinch(event) {
+      if (event.touches.length < 2) this.previewPinch = null
     },
     updatePreviewFit() {
       const viewport = this.$refs.previewViewport

@@ -48,6 +48,7 @@ button { cursor: pointer; }
   min-width: 0;
   overflow: hidden;
   overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
 }
 .calendar-preview-wrap.is-zoomed {
   max-height: 78vh;

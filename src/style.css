@@ -75,18 +75,6 @@ button { cursor: pointer; }
   border-bottom: 3px solid #17233f;
 }
 .calendar-identity { display: flex; align-items: center; gap: 13px; min-width: 0; }
-.calendar-mark {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 13px;
-  background: #f26950;
-  color: white;
-  font-size: 23px;
-  box-shadow: inset 0 -5px 0 rgb(139 51 37 / .25);
-}
 .calendar-identity h1 {
   overflow: hidden;
   max-width: 4.4in;
@@ -258,7 +246,6 @@ button { cursor: pointer; }
 .density-compact .day-number.event-dot { --event-circle-size: 17px; }
 .density-compact .month-events { font-size: 7.3px; }
 .density-tight .calendar-header { min-height: .62in; margin-bottom: .1in; padding-bottom: .1in; }
-.density-tight .calendar-mark { width: 40px; height: 40px; font-size: 19px; }
 .density-tight .calendar-identity h1 { font-size: 19px; }
 .density-tight .calendar-year strong { font-size: 30px; }
 .density-tight .months-grid { height: 9.48in; row-gap: .035in; }

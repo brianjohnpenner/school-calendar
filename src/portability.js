@@ -1,4 +1,6 @@
-import { categories, FORMAT, FORMAT_VERSION, monthCount, plainClone, regions, uid } from './data.js'
+import { categories, monthCount } from './data.js'
+
+const CSV_HEADER = ['type', 'name', 'start_date', 'end_date', 'category']
 
 function validDate(value) {
   return typeof value === 'string' &&
@@ -21,14 +23,10 @@ function validateCalendar(calendar) {
   if (!calendar || typeof calendar !== 'object') return ['Calendar is not an object.']
   if (!calendar.name || typeof calendar.name !== 'string') errors.push('Calendar name is missing.')
   if (!calendar.schoolName || typeof calendar.schoolName !== 'string') errors.push('School name is missing.')
-  if (!validDate(calendar.term?.firstDay) || !validDate(calendar.term?.lastDay)) errors.push('Term dates are invalid.')
-  if (calendar.term?.firstDay > calendar.term?.lastDay) errors.push('Term ends before it starts.')
-  const months = monthCount(calendar.term?.firstDay, calendar.term?.lastDay)
+  if (!validDate(calendar.firstDay) || !validDate(calendar.lastDay)) errors.push('Term dates are invalid.')
+  if (calendar.firstDay > calendar.lastDay) errors.push('Term ends before it starts.')
+  const months = monthCount(calendar.firstDay, calendar.lastDay)
   if (months < 8 || months > 12) errors.push('Term must span 8–12 calendar months.')
-  if (!regions[calendar.locale?.country]) errors.push('Country is not supported.')
-  else if (!regions[calendar.locale.country].subdivisions[calendar.locale?.subdivision]) {
-    errors.push('Province or state is not supported.')
-  }
   if (!Array.isArray(calendar.events)) errors.push('Events must be an array.')
   else calendar.events.forEach((event, index) =>
     validateEvent(event).forEach((error) => errors.push(`Event ${index + 1}: ${error}`))
@@ -36,60 +34,111 @@ function validateCalendar(calendar) {
   return errors
 }
 
-export function exportEnvelope(calendars, scope) {
-  return {
-    format: FORMAT,
-    formatVersion: FORMAT_VERSION,
-    exportedAt: new Date().toISOString(),
-    scope,
-    calendars: plainClone(calendars),
+function encodeCsvCell(value = '') {
+  const text = String(value)
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+function parseCsvRows(text) {
+  const rows = []
+  let row = []
+  let cell = ''
+  let quoted = false
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]
+    if (quoted) {
+      if (character === '"' && text[index + 1] === '"') {
+        cell += '"'
+        index += 1
+      } else if (character === '"') {
+        quoted = false
+      } else {
+        cell += character
+      }
+    } else if (character === '"') {
+      if (cell) throw new Error('The CSV file contains an invalid quote.')
+      quoted = true
+    } else if (character === ',') {
+      row.push(cell)
+      cell = ''
+    } else if (character === '\n') {
+      row.push(cell.replace(/\r$/, ''))
+      rows.push(row)
+      row = []
+      cell = ''
+    } else {
+      cell += character
+    }
   }
+
+  if (quoted) throw new Error('The CSV file contains an unclosed quote.')
+  if (cell || row.length) {
+    row.push(cell.replace(/\r$/, ''))
+    rows.push(row)
+  }
+  return rows.filter((values) => values.some((value) => value.trim()))
+}
+
+export function exportCalendarCsv(calendar) {
+  const rows = [
+    CSV_HEADER,
+    ['school_name', calendar.schoolName, '', '', ''],
+    ['calendar_name', calendar.name, '', '', ''],
+    ['first_day', 'First Day of School', calendar.firstDay, calendar.firstDay, 'school'],
+    ...calendar.events.map((event) => [
+      'event', event.title, event.startDate, event.endDate, event.category,
+    ]),
+    ['last_day', 'Last Day of School', calendar.lastDay, calendar.lastDay, 'school'],
+  ]
+  return `${rows.map((row) => row.map(encodeCsvCell).join(',')).join('\r\n')}\r\n`
 }
 
 export function parseImport(text) {
-  let payload
-  try {
-    payload = JSON.parse(text)
-  } catch {
-    throw new Error('This file does not contain valid JSON.')
+  const rows = parseCsvRows(text.replace(/^\uFEFF/, ''))
+  if (!rows.length || rows[0].map((value) => value.trim().toLowerCase()).join(',') !== CSV_HEADER.join(',')) {
+    throw new Error(`The CSV header must be: ${CSV_HEADER.join(',')}.`)
   }
 
-  if (payload.format !== FORMAT) throw new Error('This is not a School Calendar Generator file.')
-  if (payload.formatVersion > FORMAT_VERSION) throw new Error('This file was created by a newer version of the app.')
-  if (payload.formatVersion !== FORMAT_VERSION) throw new Error('This file version is not supported.')
-  if (!Array.isArray(payload.calendars) || payload.calendars.length === 0) {
-    throw new Error('The file does not contain any calendars.')
-  }
-
-  const previews = payload.calendars.map((calendar) => ({
-    calendar,
-    selected: true,
-    errors: validateCalendar(calendar),
-  }))
-  return previews
-}
-
-export function mergeCalendars(current, selected) {
-  const calendarIds = new Set(current.map((calendar) => calendar.id))
-  const eventIds = new Set(current.flatMap((calendar) => calendar.events.map((event) => event.id)))
-
-  return selected.map((source) => {
-    const calendar = plainClone(source)
-    if (!calendar.id || calendarIds.has(calendar.id)) calendar.id = uid('cal')
-    calendarIds.add(calendar.id)
-
-    calendar.events = calendar.events.map((event) => {
-      if (!event.id || eventIds.has(event.id)) event.id = uid('evt')
-      eventIds.add(event.id)
-      return event
-    })
-    calendar.updatedAt = new Date().toISOString()
-    return calendar
+  const records = rows.slice(1).map((values, index) => {
+    if (values.length !== CSV_HEADER.length) {
+      throw new Error(`CSV row ${index + 2} must contain ${CSV_HEADER.length} columns.`)
+    }
+    const [type, name, startDate, endDate, category] = values.map((value) => value.trim())
+    return { type: type.toLowerCase(), name, startDate, endDate, category: category.toLowerCase() }
   })
+  const recordsOfType = (type) => records.filter((record) => record.type === type)
+  const singleRecord = (type) => {
+    const matches = recordsOfType(type)
+    if (matches.length !== 1) throw new Error(`The CSV file must contain exactly one ${type} row.`)
+    return matches[0]
+  }
+  const schoolName = singleRecord('school_name').name
+  const calendarName = singleRecord('calendar_name').name
+  const firstDay = singleRecord('first_day').startDate
+  const lastDay = singleRecord('last_day').startDate
+  const unknown = records.find((record) =>
+    !['school_name', 'calendar_name', 'first_day', 'event', 'last_day'].includes(record.type)
+  )
+  if (unknown) throw new Error(`Unknown CSV row type: ${unknown.type || '(blank)'}.`)
+
+  const calendar = {
+    name: calendarName,
+    schoolName,
+    firstDay,
+    lastDay,
+    events: recordsOfType('event').map((record) => ({
+      title: record.name,
+      startDate: record.startDate,
+      endDate: record.endDate,
+      category: record.category,
+    })),
+  }
+  return [{ calendar, selected: true, errors: validateCalendar(calendar) }]
 }
 
-export function downloadJson(envelope, filename) {
-  const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' })
+export function downloadCsv(csv, filename) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -100,8 +149,8 @@ export function downloadJson(envelope, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export async function shareJson(envelope, filename) {
-  const file = new File([JSON.stringify(envelope, null, 2)], filename, { type: 'application/json' })
+export async function shareCsv(csv, filename) {
+  const file = new File([csv], filename, { type: 'text/csv' })
   if (!navigator.canShare?.({ files: [file] })) return false
   await navigator.share({ title: 'School calendar', files: [file] })
   return true

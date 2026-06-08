@@ -24,7 +24,6 @@ export function holidaySuggestions(country, subdivision, firstDay, lastDay) {
         startDate: date,
         endDate: date,
         category: holiday.type === 'school' ? 'break' : 'holiday',
-        source: 'holiday',
         holiday: {
           provider: 'date-holidays',
           type: holiday.type,

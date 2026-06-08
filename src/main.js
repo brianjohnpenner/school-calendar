@@ -6,7 +6,7 @@ import {
   calendarMonths, schoolDayStats, plainClone, uid, todayIso,
 } from './data.js'
 import { buildMonthView, formatFullDate } from './calendar-view.js'
-import { exportEnvelope, parseImport, mergeCalendars, downloadJson, shareJson } from './portability.js'
+import { exportCalendarCsv, parseImport, downloadCsv, shareCsv } from './portability.js'
 
 Alpine.plugin(persist)
 
@@ -23,7 +23,7 @@ function blankDraft() {
 }
 
 function blankEvent() {
-  return { id: null, title: '', startDate: todayIso(), endDate: todayIso(), category: 'custom', source: 'custom' }
+  return { index: null, title: '', startDate: todayIso(), endDate: todayIso(), category: 'custom' }
 }
 
 function isoFromDate(date) {
@@ -55,7 +55,6 @@ function defaultBreakSuggestions(firstDay, lastDay) {
       endDate: christmasEnd > lastDay ? lastDay : christmasEnd,
       enabled: christmasStart <= lastDay && christmasEnd >= firstDay,
       category: 'break',
-      source: 'custom',
     },
     {
       suggestionId: uid('break'),
@@ -64,7 +63,6 @@ function defaultBreakSuggestions(firstDay, lastDay) {
       endDate: springEnd > lastDay ? lastDay : springEnd,
       enabled: springStart <= lastDay && springEnd >= firstDay,
       category: 'break',
-      source: 'custom',
     },
   ]
 }
@@ -101,7 +99,7 @@ document.addEventListener('alpine:init', () => {
 
     init() {
       const state = this.$store.calendarData.state
-      if (!state?.schemaVersion || !Array.isArray(state.calendars)) {
+      if (!state || !Array.isArray(state.calendars)) {
         this.$store.calendarData.state = defaultState()
       }
       if (this.activeCalendar) this.view = 'editor'
@@ -109,7 +107,7 @@ document.addEventListener('alpine:init', () => {
 
     get state() { return this.$store.calendarData.state },
     get activeCalendar() {
-      return this.state.calendars.find((calendar) => calendar.id === this.state.activeCalendarId) ?? null
+      return this.state.calendars[this.state.activeCalendar] ?? null
     },
     get months() {
       return calendarMonths(this.activeCalendar)
@@ -118,7 +116,9 @@ document.addEventListener('alpine:init', () => {
     get schoolDaySummary() { return schoolDayStats(this.activeCalendar) },
     get sortedEvents() {
       return this.activeCalendar
-        ? [...this.activeCalendar.events].sort((a, b) => a.startDate.localeCompare(b.startDate))
+        ? this.activeCalendar.events
+          .map((event, index) => ({ ...event, index }))
+          .sort((a, b) => a.startDate.localeCompare(b.startDate))
         : []
     },
     get eventCount() { return (this.activeCalendar?.events.length ?? 0) + 2 },
@@ -148,8 +148,8 @@ document.addEventListener('alpine:init', () => {
 
     get shortSchoolYearLabel() {
       if (!this.activeCalendar) return ''
-      const start = this.activeCalendar.term.firstDay.slice(0, 4)
-      const end = this.activeCalendar.term.lastDay.slice(2, 4)
+      const start = this.activeCalendar.firstDay.slice(0, 4)
+      const end = this.activeCalendar.lastDay.slice(2, 4)
       return `${start}–${end}`
     },
     formatDate(date) {
@@ -262,7 +262,11 @@ document.addEventListener('alpine:init', () => {
     },
 
     startWizard() {
-      this.draft = blankDraft()
+      this.draft = {
+        ...blankDraft(),
+        country: this.state.country,
+        subdivision: this.state.subdivision,
+      }
       this.wizardStep = 1
       this.breakSuggestions = []
       this.suggestions = []
@@ -274,10 +278,10 @@ document.addEventListener('alpine:init', () => {
       this.draft = {
         name: calendar.name,
         schoolName: calendar.schoolName,
-        firstDay: calendar.term.firstDay,
-        lastDay: calendar.term.lastDay,
-        country: calendar.locale.country,
-        subdivision: calendar.locale.subdivision,
+        firstDay: calendar.firstDay,
+        lastDay: calendar.lastDay,
+        country: this.state.country,
+        subdivision: this.state.subdivision,
       }
       this.settingsOpen = true
     },
@@ -313,9 +317,9 @@ document.addEventListener('alpine:init', () => {
       const selected = [...selectedBreaks, ...selectedHolidays]
       const calendar = createCalendar(this.draft, selected)
       this.state.calendars.push(calendar)
-      this.state.activeCalendarId = calendar.id
-      this.state.preferences.lastCountry = calendar.locale.country
-      this.state.preferences.lastSubdivision = calendar.locale.subdivision
+      this.state.activeCalendar = this.state.calendars.length - 1
+      this.state.country = this.draft.country
+      this.state.subdivision = this.draft.subdivision
       this.view = 'editor'
       this.flash('Calendar created.')
     },
@@ -325,77 +329,73 @@ document.addEventListener('alpine:init', () => {
       Object.assign(calendar, {
         name: this.draft.name.trim(),
         schoolName: this.draft.schoolName.trim(),
-        term: { firstDay: this.draft.firstDay, lastDay: this.draft.lastDay },
-        locale: { ...calendar.locale, country: this.draft.country, subdivision: this.draft.subdivision },
-        updatedAt: new Date().toISOString(),
+        firstDay: this.draft.firstDay,
+        lastDay: this.draft.lastDay,
       })
+      this.state.country = this.draft.country
+      this.state.subdivision = this.draft.subdivision
       this.settingsOpen = false
       this.flash('Calendar settings saved.')
     },
-    selectCalendar(id) {
-      this.state.activeCalendarId = id
+    selectCalendar(index) {
+      this.state.activeCalendar = Number(index)
       this.view = 'editor'
     },
     duplicateCalendar() {
       const copy = plainClone(this.activeCalendar)
-      copy.id = uid('cal')
       copy.name = `${copy.name} Copy`
-      copy.events = copy.events.map((event) => ({ ...event, id: uid('evt') }))
-      copy.createdAt = copy.updatedAt = new Date().toISOString()
       this.state.calendars.push(copy)
-      this.state.activeCalendarId = copy.id
+      this.state.activeCalendar = this.state.calendars.length - 1
       this.flash('Calendar duplicated.')
     },
     deleteCalendar() {
       if (!confirm(`Delete “${this.activeCalendar.name}”? This cannot be undone.`)) return
-      const id = this.activeCalendar.id
-      this.state.calendars = this.state.calendars.filter((calendar) => calendar.id !== id)
-      this.state.activeCalendarId = this.state.calendars[0]?.id ?? null
+      this.state.calendars.splice(this.state.activeCalendar, 1)
+      this.state.activeCalendar = this.state.calendars.length ? 0 : null
       this.view = this.activeCalendar ? 'editor' : 'home'
     },
     openEvent(event = null) {
       this.eventForm = event ? plainClone(event) : {
         ...blankEvent(),
-        startDate: this.activeCalendar.term.firstDay,
-        endDate: this.activeCalendar.term.firstDay,
+        startDate: this.activeCalendar.firstDay,
+        endDate: this.activeCalendar.firstDay,
       }
       this.eventDialogOpen = true
     },
     saveEvent() {
       if (!this.eventForm.title.trim() || this.eventForm.startDate > this.eventForm.endDate) return
       const calendar = this.activeCalendar
-      if (this.eventForm.id) {
-        const index = calendar.events.findIndex((event) => event.id === this.eventForm.id)
-        calendar.events[index] = { ...this.eventForm, title: this.eventForm.title.trim() }
+      const { index, ...event } = this.eventForm
+      if (index !== null) {
+        calendar.events[index] = { ...event, title: event.title.trim() }
       } else {
-        calendar.events.push({ ...this.eventForm, id: uid('evt'), title: this.eventForm.title.trim() })
+        calendar.events.push({ ...event, title: event.title.trim() })
       }
-      calendar.updatedAt = new Date().toISOString()
       this.eventDialogOpen = false
       this.flash('Event saved.')
     },
-    deleteEvent(id) {
-      this.activeCalendar.events = this.activeCalendar.events.filter((event) => event.id !== id)
+    deleteEvent(index) {
+      this.activeCalendar.events.splice(index, 1)
       this.eventDialogOpen = false
       this.flash('Event deleted.')
     },
     exportCurrent() {
-      const envelope = exportEnvelope([this.activeCalendar], 'calendar')
-      downloadJson(envelope, `${this.slug(this.activeCalendar.name)}.calendar.json`)
-    },
-    exportAll() {
-      downloadJson(exportEnvelope(this.state.calendars, 'backup'), `school-calendars-backup-${todayIso()}.json`)
+      const csv = exportCalendarCsv(this.activeCalendar)
+      downloadCsv(csv, `${this.slug(this.activeCalendar.name)}.calendar.csv`)
     },
     async shareCurrent() {
-      const envelope = exportEnvelope([this.activeCalendar], 'calendar')
-      const filename = `${this.slug(this.activeCalendar.name)}.calendar.json`
+      const csv = exportCalendarCsv(this.activeCalendar)
+      const filename = `${this.slug(this.activeCalendar.name)}.calendar.csv`
       try {
-        if (!await shareJson(envelope, filename)) {
-          downloadJson(envelope, filename)
-          this.flash('Sharing is unavailable here, so the JSON file was downloaded.')
+        if (!await shareCsv(csv, filename)) {
+          downloadCsv(csv, filename)
+          this.flash('Sharing is unavailable here, so the CSV file was downloaded.')
         }
       } catch (error) {
-        if (error.name !== 'AbortError') this.flash('The calendar could not be shared.')
+        if (error.name !== 'AbortError') {
+          downloadCsv(csv, filename)
+          this.flash('Sharing failed, so the CSV file was downloaded instead.')
+        }
       }
     },
     async readImport(file) {
@@ -416,9 +416,8 @@ document.addEventListener('alpine:init', () => {
         .filter((preview) => preview.selected && preview.errors.length === 0)
         .map((preview) => preview.calendar)
       if (!valid.length) return
-      const imported = mergeCalendars(this.state.calendars, valid)
-      this.state.calendars.push(...imported)
-      this.state.activeCalendarId = imported[0].id
+      this.state.calendars.push(...valid)
+      this.state.activeCalendar = this.state.calendars.length - valid.length
       this.importOpen = false
       this.importPreviews = []
       this.view = 'editor'

@@ -1,6 +1,4 @@
-export const STORAGE_KEY = 'school-calendar-generator:v1'
-export const FORMAT = 'school-calendar-generator'
-export const FORMAT_VERSION = 1
+export const STORAGE_KEY = 'school-calendar-generator:v2'
 
 export const categories = {
   school: { label: 'School day', className: 'event-school' },
@@ -54,10 +52,10 @@ export function todayIso() {
 
 export function defaultState() {
   return {
-    schemaVersion: 1,
-    activeCalendarId: null,
+    activeCalendar: null,
+    country: 'CA',
+    subdivision: 'ON',
     calendars: [],
-    preferences: { lastCountry: 'CA', lastSubdivision: 'ON' },
   }
 }
 
@@ -69,29 +67,24 @@ export function monthCount(startDate, endDate) {
 }
 
 export function createCalendar(draft, selectedHolidays = []) {
-  const now = new Date().toISOString()
   return {
-    id: uid('cal'),
     name: draft.name.trim(),
     schoolName: draft.schoolName.trim(),
-    term: { firstDay: draft.firstDay, lastDay: draft.lastDay },
-    locale: {
-      country: draft.country,
-      subdivision: draft.subdivision,
-      language: 'en',
-      weekStartsOn: 0,
-    },
-    appearance: { theme: 'modern', pageSize: 'letter', orientation: 'portrait' },
-    events: selectedHolidays.map((event) => ({ ...event, id: uid('evt') })),
-    createdAt: now,
-    updatedAt: now,
+    firstDay: draft.firstDay,
+    lastDay: draft.lastDay,
+    events: selectedHolidays.map(({ title, startDate, endDate, category }) => ({
+      title,
+      startDate,
+      endDate,
+      category,
+    })),
   }
 }
 
 export function calendarMonths(calendar) {
   if (!calendar) return []
-  const [year, month] = calendar.term.firstDay.split('-').map(Number)
-  return Array.from({ length: monthCount(calendar.term.firstDay, calendar.term.lastDay) }, (_, index) => {
+  const [year, month] = calendar.firstDay.split('-').map(Number)
+  return Array.from({ length: monthCount(calendar.firstDay, calendar.lastDay) }, (_, index) => {
     const date = new Date(Date.UTC(year, month - 1 + index, 1))
     return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 }
   })
@@ -127,26 +120,24 @@ export function derivedEvents(calendar) {
     {
       id: 'system-first-day',
       title: 'First Day of School',
-      startDate: calendar.term.firstDay,
-      endDate: calendar.term.firstDay,
+      startDate: calendar.firstDay,
+      endDate: calendar.firstDay,
       category: 'school',
-      source: 'system',
     },
     {
       id: 'system-last-day',
       title: 'Last Day of School',
-      startDate: calendar.term.lastDay,
-      endDate: calendar.term.lastDay,
+      startDate: calendar.lastDay,
+      endDate: calendar.lastDay,
       category: 'school',
-      source: 'system',
     },
   ]
 }
 
 export function schoolYearLabel(calendar) {
   if (!calendar) return ''
-  const start = calendar.term.firstDay.slice(0, 4)
-  const end = calendar.term.lastDay.slice(0, 4)
+  const start = calendar.firstDay.slice(0, 4)
+  const end = calendar.lastDay.slice(0, 4)
   return start === end ? start : `${start} – ${end}`
 }
 
@@ -167,8 +158,8 @@ export function schoolDayStats(calendar) {
   let administrationDays = 0
 
   for (
-    let date = new Date(`${calendar.term.firstDay}T00:00:00Z`);
-    isoFromUtcDate(date) <= calendar.term.lastDay;
+    let date = new Date(`${calendar.firstDay}T00:00:00Z`);
+    isoFromUtcDate(date) <= calendar.lastDay;
     date.setUTCDate(date.getUTCDate() + 1)
   ) {
     const iso = isoFromUtcDate(date)

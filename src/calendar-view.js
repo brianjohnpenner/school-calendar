@@ -61,8 +61,9 @@ export function buildMonthView(calendar, month, index) {
         return { date, number, classes: dayClassNames(calendar, date) }
       })
     ),
-    events: eventsForMonth(calendar, month.year, month.month).map((event) => ({
+    events: eventsForMonth(calendar, month.year, month.month).map((event, eventIndex) => ({
       ...event,
+      key: `${event.category}-${event.startDate}-${event.endDate}-${event.title}-${eventIndex}`,
       className: categories[event.category].className,
       dateLabel: formatEventDate(event),
     })),

@@ -180,7 +180,7 @@
               <div class="border-b border-slate-200 p-4">
                 <div class="flex items-center justify-between">
                   <h2 class="font-semibold">Events</h2>
-                  <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600" x-text="(activeCalendar?.events.length ?? 0) + 2"></span>
+                  <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600" x-text="eventCount"></span>
                 </div>
               </div>
               <div class="max-h-[430px] divide-y divide-slate-100 overflow-y-auto">
@@ -188,7 +188,7 @@
                   <strong class="block text-sm text-blue-800">First Day of School</strong>
                   <span class="text-xs text-slate-500" x-text="activeCalendar ? formatDate(activeCalendar.term.firstDay) : ''"></span>
                 </button>
-                <template x-for="event in activeCalendar ? [...activeCalendar.events].sort((a,b) => a.startDate.localeCompare(b.startDate)) : []" :key="event.id">
+                <template x-for="event in sortedEvents" :key="event.id">
                   <button class="block w-full p-4 text-left hover:bg-slate-50" @click="openEvent(event)">
                     <strong class="event-list-label block truncate text-sm" :class="categories[event.category].className" x-text="event.title"></strong>
                     <span class="text-xs text-slate-500" x-text="event.startDate === event.endDate ? formatDate(event.startDate) : `${formatDate(event.startDate)} – ${formatDate(event.endDate)}`"></span>
@@ -209,7 +209,7 @@
           </aside>
 
           <section class="calendar-preview-wrap rounded-2xl bg-slate-300/60 p-3 sm:p-6">
-            <article id="print-sheet" class="calendar-sheet" :class="printDensityClass" :style="`--month-rows: ${Math.ceil(months.length / 2)}`">
+            <article id="print-sheet" class="calendar-sheet" :class="printDensityClass" :style="{ '--month-rows': monthRowCount }">
               <header class="calendar-header">
                 <div class="calendar-identity">
                   <span class="calendar-mark" aria-hidden="true">★</span>
@@ -217,33 +217,33 @@
                     <h1 x-text="activeCalendar ? activeCalendar.schoolName : ''"></h1>
                     <div class="calendar-legend">
                       <span><i class="legend-dot legend-school"></i>School event</span>
-                      <span><i class="legend-dot legend-administration"></i>Admin day</span>
+                      <span><i class="legend-half legend-administration"></i>Admin day</span>
                       <span><i class="legend-ring legend-holiday"></i>Holiday</span>
-                      <span><i class="legend-bar legend-break"></i>Break</span>
+                      <span><i class="legend-ring legend-break"></i>Break</span>
                     </div>
                   </div>
                 </div>
                 <div class="calendar-year">
-                  <strong x-text="shortSchoolYearLabel()"></strong>
+                  <strong x-text="shortSchoolYearLabel"></strong>
                   <span>School Calendar</span>
                 </div>
               </header>
               <div class="months-grid">
-                <template x-for="(month, monthIndex) in months" :key="`${month.year}-${month.month}`">
-                  <section class="month-block" :style="`--month-accent: ${monthAccent(monthIndex)}`">
+                <template x-for="month in months" :key="month.key">
+                  <section class="month-block" :style="{ '--month-accent': month.accent }">
                     <h2 class="month-heading">
-                      <span x-text="monthName(month.year, month.month).split(' ')[0]"></span>
+                      <span x-text="month.name"></span>
                       <small x-text="month.year"></small>
                     </h2>
                     <table class="month-table">
                       <thead><tr><template x-for="(day, dayIndex) in weekdays"><th :class="{ 'weekend': dayIndex === 0 || dayIndex === 6 }" x-text="day.slice(0, 1)"></th></template></tr></thead>
                       <tbody>
-                        <template x-for="week in Math.ceil(monthGrid(month.year, month.month).length / 7)">
+                        <template x-for="(week, weekIndex) in month.weeks" :key="`${month.key}-${weekIndex}`">
                           <tr>
-                            <template x-for="column in 7">
-                              <td :class="{ 'weekend': column === 1 || column === 7 }">
-                                <template x-if="monthGrid(month.year, month.month)[(week - 1) * 7 + column - 1]">
-                                  <span class="day-number" :class="dayClasses(isoDate(month.year, month.month, monthGrid(month.year, month.month)[(week - 1) * 7 + column - 1]))" x-text="monthGrid(month.year, month.month)[(week - 1) * 7 + column - 1]"></span>
+                            <template x-for="(day, dayIndex) in week" :key="day?.date ?? `${month.key}-${weekIndex}-${dayIndex}`">
+                              <td :class="{ 'weekend': dayIndex === 0 || dayIndex === 6 }">
+                                <template x-if="day">
+                                  <span class="day-number" :class="day.classes" x-text="day.number"></span>
                                 </template>
                               </td>
                             </template>
@@ -252,9 +252,9 @@
                       </tbody>
                     </table>
                     <div class="month-events">
-                      <template x-for="event in eventsForMonth(month.year, month.month)" :key="`${event.id}-${month.year}-${month.month}`">
-                        <div class="month-event" :class="categories[event.category].className">
-                          <span class="month-event-date" x-text="formatEventDate(event)"></span>
+                      <template x-for="event in month.events" :key="`${event.id}-${month.key}`">
+                        <div class="month-event" :class="event.className">
+                          <span class="month-event-date" x-text="event.dateLabel"></span>
                           <span class="month-event-title" x-text="event.title"></span>
                         </div>
                       </template>

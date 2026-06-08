@@ -3,9 +3,9 @@ import persist from '@alpinejs/persist'
 import './style.css'
 import {
   STORAGE_KEY, categories, regions, defaultState, monthCount, createCalendar,
-  calendarMonths, monthGrid, isoDate, eventsForMonth, eventsForDay, schoolYearLabel,
-  schoolDayStats, plainClone, uid, todayIso,
+  calendarMonths, schoolDayStats, plainClone, uid, todayIso,
 } from './data.js'
+import { buildMonthView, formatFullDate } from './calendar-view.js'
 import { exportEnvelope, parseImport, mergeCalendars, downloadJson, shareJson } from './portability.js'
 
 Alpine.plugin(persist)
@@ -105,8 +105,18 @@ document.addEventListener('alpine:init', () => {
     get activeCalendar() {
       return this.state.calendars.find((calendar) => calendar.id === this.state.activeCalendarId) ?? null
     },
-    get months() { return calendarMonths(this.activeCalendar) },
+    get months() {
+      return calendarMonths(this.activeCalendar)
+        .map((month, index) => buildMonthView(this.activeCalendar, month, index))
+    },
     get schoolDaySummary() { return schoolDayStats(this.activeCalendar) },
+    get sortedEvents() {
+      return this.activeCalendar
+        ? [...this.activeCalendar.events].sort((a, b) => a.startDate.localeCompare(b.startDate))
+        : []
+    },
+    get eventCount() { return (this.activeCalendar?.events.length ?? 0) + 2 },
+    get monthRowCount() { return Math.ceil(calendarMonths(this.activeCalendar).length / 2) },
     get termMonthCount() { return monthCount(this.draft.firstDay, this.draft.lastDay) },
     get subdivisions() { return this.regions[this.draft.country]?.subdivisions ?? {} },
     get wizardValid() {
@@ -123,57 +133,22 @@ document.addEventListener('alpine:init', () => {
       )
     },
     get printDensityClass() {
-      const count = this.months.length
+      const count = calendarMonths(this.activeCalendar).length
       const eventCount = this.activeCalendar?.events.length ?? 0
       if (count >= 12 || eventCount > 28) return 'density-tight'
       if (count >= 11 || eventCount > 18) return 'density-compact'
       return 'density-comfortable'
     },
 
-    monthGrid,
-    isoDate,
-    eventsForMonth(year, month) { return eventsForMonth(this.activeCalendar, year, month) },
-    dayClasses(date) {
-      const events = eventsForDay(this.activeCalendar, date)
-      if (!events.length) return ''
-      const singleDayEvent = events.find((event) => event.startDate === event.endDate)
-      const rangeEvent = events.find((event) => event.startDate !== event.endDate)
-      const event = singleDayEvent ?? rangeEvent
-      const markers = [
-        singleDayEvent ? 'event-dot' : '',
-        rangeEvent ? 'event-range' : '',
-        singleDayEvent && rangeEvent ? 'event-layered' : '',
-      ]
-
-      return `${categories[event.category]?.className ?? ''} ${markers.join(' ')}`
-    },
-    schoolYearLabel() { return schoolYearLabel(this.activeCalendar) },
-    shortSchoolYearLabel() {
+    get shortSchoolYearLabel() {
       if (!this.activeCalendar) return ''
       const start = this.activeCalendar.term.firstDay.slice(0, 4)
       const end = this.activeCalendar.term.lastDay.slice(2, 4)
       return `${start}–${end}`
     },
-    monthAccent(index) {
-      return ['#2f6fd6', '#db6b1f', '#b84f4a', '#149860', '#3192ba', '#d84d79', '#579b3d', '#7d5ac7', '#df4968', '#d08a16'][index % 10]
-    },
-    monthName(year, month) {
-      return new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: 'UTC' })
-        .format(new Date(Date.UTC(year, month - 1, 1)))
-    },
     formatDate(date) {
-      return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
-        .format(new Date(`${date}T00:00:00Z`))
+      return formatFullDate(date)
     },
-    formatEventDate(event) {
-      const formatter = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', timeZone: 'UTC' })
-      const start = formatter.format(new Date(`${event.startDate}T00:00:00Z`))
-      if (event.startDate === event.endDate) return start
-
-      const end = formatter.format(new Date(`${event.endDate}T00:00:00Z`))
-      return `${start}–${end}`
-    },
-    categoryLabel(key) { return categories[key]?.label ?? key },
 
     startWizard() {
       this.draft = blankDraft()

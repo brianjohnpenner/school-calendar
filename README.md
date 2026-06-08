@@ -17,14 +17,19 @@ npm run build
 
 Calendar data is stored in the current browser through Alpine Persist. Use the CSV download and import tools to move individual calendars between browsers.
 
-## GitHub Pages
+## Cloudflare Pages
 
-The workflow in `.github/workflows/deploy-pages.yml` builds pull requests and deploys pushes to `main` or `master`.
+Deployment uses Cloudflare Pages' Git integration — Cloudflare builds and deploys on every push, no API tokens or CI workflow required.
 
-In the repository on GitHub:
+One-time setup in the Cloudflare dashboard:
 
-1. Open **Settings → Pages**.
-2. Set **Source** to **GitHub Actions**.
-3. Push to the default branch.
+1. Go to **Workers & Pages → Create → Pages → Connect to Git**.
+2. Select the `school-calendar` repository.
+3. Set the build settings:
+   - **Build command:** `npm run build`
+   - **Build output directory:** `dist`
+4. Save and deploy.
 
-Vite derives the GitHub project-page base path from `GITHUB_REPOSITORY` during the Actions build.
+Cloudflare deploys pushes to the production branch (`master`) and creates preview deployments for other branches and pull requests. The `wrangler.toml` records the build output directory; the build settings above must match it.
+
+To deploy manually from your machine instead, run `npx wrangler pages deploy dist` after `npm run build`.

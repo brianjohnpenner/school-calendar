@@ -16,7 +16,6 @@
   font-synthesis: none;
 }
 
-[x-cloak] { display: none !important; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 

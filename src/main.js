@@ -29,6 +29,7 @@ function blankEvent() {
 }
 
 const WELCOME_NOTICE_KEY = 'school-calendar-generator:welcome-v2'
+const STORAGE_TIP_KEY = 'school-calendar-generator:storage-tip-v1'
 
 function validIso(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value ?? '')
@@ -121,6 +122,8 @@ document.addEventListener('alpine:init', () => {
     importPreviews: [],
     loadingHolidays: false,
     welcomeOpen: false,
+    storageTipOpen: false,
+    dataHelpOpen: false,
     notice: '',
     previewScale: 1,
     previewFitScale: 1,
@@ -156,8 +159,10 @@ document.addEventListener('alpine:init', () => {
       if (!this.activeCalendar) this.resetWizard()
       try {
         this.welcomeOpen = !this.activeCalendar && !localStorage.getItem(WELCOME_NOTICE_KEY)
+        this.storageTipOpen = !this.welcomeOpen && !localStorage.getItem(STORAGE_TIP_KEY)
       } catch {
         this.welcomeOpen = !this.activeCalendar
+        this.storageTipOpen = !this.welcomeOpen
       }
     },
 
@@ -414,9 +419,16 @@ document.addEventListener('alpine:init', () => {
       this.flash('Calendar settings saved.')
     },
     deleteCalendar() {
-      if (!confirm(`Delete “${this.activeCalendar.name}”? This cannot be undone.`)) return
+      if (!confirm(`Start over and delete “${this.activeCalendar.name}”? This cannot be undone.`)) return
       this.state.calendar = null
       this.resetWizard()
+      this.storageTipOpen = false
+      this.dataHelpOpen = false
+      this.welcomeOpen = true
+      try {
+        localStorage.removeItem(WELCOME_NOTICE_KEY)
+        localStorage.removeItem(STORAGE_TIP_KEY)
+      } catch { /* storage unavailable */ }
     },
     openEvent(event = null) {
       this.eventForm = event ? plainClone(event) : {
@@ -500,9 +512,22 @@ document.addEventListener('alpine:init', () => {
       this.importPreviews = []
       this.flash('Calendar imported.')
     },
-    dismissWelcome() {
+    dismissWelcome(showStorageTip = true) {
       this.welcomeOpen = false
       try { localStorage.setItem(WELCOME_NOTICE_KEY, '1') } catch { /* storage unavailable */ }
+      if (showStorageTip) this.showStorageTip()
+    },
+    showStorageTip() {
+      this.dataHelpOpen = false
+      this.storageTipOpen = true
+    },
+    dismissStorageTip() {
+      this.storageTipOpen = false
+      try { localStorage.setItem(STORAGE_TIP_KEY, '1') } catch { /* storage unavailable */ }
+    },
+    openDataHelp() {
+      this.dismissStorageTip()
+      this.dataHelpOpen = true
     },
     printCalendar() { window.print() },
     slug(value) {

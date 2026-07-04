@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Serve",
+      "type": "shell",
+      "command": "npx serve .",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "serve",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Accepting connections at"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false
+      }
+    }
+  ]
+}

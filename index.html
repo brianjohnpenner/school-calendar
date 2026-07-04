@@ -211,7 +211,7 @@
                   <button class="btn-quiet" @click="importOpen = true">Import</button>
                   <button class="btn-quiet" @click="shareCurrent()">Share</button>
                   <button class="btn-quiet" @click="exportCurrent()">Download</button>
-                  <button class="btn-quiet col-span-2 text-red-700 hover:bg-red-50" @click="deleteCalendar()">Delete calendar</button>
+                  <button class="btn-quiet col-span-2 text-red-700 hover:bg-red-50" @click="deleteCalendar()">Start over</button>
                 </div>
               </section>
             </div>
@@ -301,19 +301,68 @@
         </div>
       </main>
 
-      <div x-show="storageNoticeOpen" class="modal-backdrop">
-        <div class="modal-card max-w-md">
-          <div class="mb-4 flex items-center gap-3">
-            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-cyan-900 text-white">
-              <svg class="size-5" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 3 6v6c0 5 3.8 8.5 9 10 5.2-1.5 9-5 9-10V6l-9-4Zm-1 13-3-3 1.4-1.4L11 12.2l4.6-4.6L17 9l-6 6Z"/></svg>
-            </span>
-            <h2 class="text-xl font-semibold">Your calendar stays in this browser</h2>
+      <div
+        x-show="welcomeOpen"
+        class="modal-backdrop welcome-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="welcome-title"
+      >
+        <section class="welcome-card">
+          <div class="welcome-copy">
+            <span class="welcome-eyebrow">A printable calendar in minutes</span>
+            <h2 id="welcome-title">Quickly create your school’s yearly calendar.</h2>
+            <p>Add your important school dates and turn them into a clear, printable calendar for the entire year.</p>
+
+            <ul class="welcome-benefits">
+              <li>
+                <span aria-hidden="true">✓</span>
+                <div><strong>Follow a simple guided setup</strong><small>Enter your school year, breaks, holidays, and other important dates.</small></div>
+              </li>
+              <li>
+                <span aria-hidden="true">✓</span>
+                <div><strong>See your calendar take shape</strong><small>Preview the full year as you add and adjust events.</small></div>
+              </li>
+              <li>
+                <span aria-hidden="true">✓</span>
+                <div><strong>Calculate your semesters</strong><small>Automatically create balanced semesters based on your school days.</small></div>
+              </li>
+              <li>
+                <span aria-hidden="true">✓</span>
+                <div><strong>Work from any screen</strong><small>Create and update your calendar with a mobile-friendly editor.</small></div>
+              </li>
+            </ul>
+
+            <div class="welcome-actions">
+              <button class="btn-primary" type="button" @click="dismissWelcome()">Create my calendar</button>
+              <button class="btn-quiet" type="button" @click="dismissWelcome(); importOpen = true">Import a calendar</button>
+            </div>
+
+            <p class="welcome-privacy">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 3 6v6c0 5 3.8 8.5 9 10 5.2-1.5 9-5 9-10V6l-9-4Zm-1 13-3-3 1.4-1.4L11 12.2l4.6-4.6L17 9l-6 6Z"/></svg>
+              Private by design. Your calendar stays in this browser and is never uploaded.
+            </p>
           </div>
-          <p class="text-sm leading-6 text-slate-600">This calendar is saved only in this browser on this device — nothing is uploaded to a server. Clearing your browsing data or switching devices will lose it. Use <strong class="text-slate-800">Download</strong> to keep a CSV backup or move it elsewhere.</p>
-          <div class="mt-6 flex justify-end">
-            <button class="btn-primary" @click="dismissStorageNotice()">Got it</button>
+
+          <div class="welcome-showcase" aria-label="Examples of the calendar editor and printed calendar">
+            <figure class="welcome-calendar-capture">
+              <img
+                src="/school-calendar-preview.jpg"
+                alt="School Calendar Generator showing the editor beside a complete portrait yearly calendar"
+              >
+              <img
+                class="welcome-mobile-capture"
+                src="/school-calendar-mobile-preview.jpg"
+                alt="The same portrait calendar preview on a mobile screen"
+              >
+              <figcaption>
+                <span>Edit dates and events</span>
+                <span>Preview instantly</span>
+                <span>Print one clear page</span>
+              </figcaption>
+            </figure>
           </div>
-        </div>
+        </section>
       </div>
 
       <div x-show="eventDialogOpen" class="modal-backdrop" @keydown.escape.window="eventDialogOpen = false">

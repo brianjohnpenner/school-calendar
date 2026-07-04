@@ -28,7 +28,7 @@ function blankEvent() {
   return { index: null, title: '', startDate: todayIso(), endDate: todayIso(), category: 'event' }
 }
 
-const STORAGE_NOTICE_KEY = 'school-calendar-generator:storage-notice'
+const WELCOME_NOTICE_KEY = 'school-calendar-generator:welcome-v2'
 
 function validIso(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value ?? '')
@@ -120,7 +120,7 @@ document.addEventListener('alpine:init', () => {
     importError: '',
     importPreviews: [],
     loadingHolidays: false,
-    storageNoticeOpen: false,
+    welcomeOpen: false,
     notice: '',
     previewScale: 1,
     previewFitScale: 1,
@@ -155,8 +155,10 @@ document.addEventListener('alpine:init', () => {
       }
       if (!this.activeCalendar) this.resetWizard()
       try {
-        if (!localStorage.getItem(STORAGE_NOTICE_KEY)) this.storageNoticeOpen = true
-      } catch { /* storage unavailable */ }
+        this.welcomeOpen = !this.activeCalendar && !localStorage.getItem(WELCOME_NOTICE_KEY)
+      } catch {
+        this.welcomeOpen = !this.activeCalendar
+      }
     },
 
     get state() { return this.$store.calendarData.state },
@@ -498,9 +500,9 @@ document.addEventListener('alpine:init', () => {
       this.importPreviews = []
       this.flash('Calendar imported.')
     },
-    dismissStorageNotice() {
-      this.storageNoticeOpen = false
-      try { localStorage.setItem(STORAGE_NOTICE_KEY, '1') } catch { /* storage unavailable */ }
+    dismissWelcome() {
+      this.welcomeOpen = false
+      try { localStorage.setItem(WELCOME_NOTICE_KEY, '1') } catch { /* storage unavailable */ }
     },
     printCalendar() { window.print() },
     slug(value) {

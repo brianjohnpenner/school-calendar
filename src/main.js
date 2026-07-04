@@ -8,6 +8,7 @@ import {
 } from './data.js'
 import { buildMonthView, formatFullDate } from './calendar-view.js'
 import { exportCalendarCsv, parseImport, downloadCsv, shareCsv } from './portability.js'
+import { track } from './analytics.js'
 
 Alpine.plugin(persist)
 
@@ -401,6 +402,12 @@ document.addEventListener('alpine:init', () => {
       this.state.calendar = createCalendar(this.draft, selected)
       this.state.country = this.draft.country
       this.state.subdivision = this.draft.subdivision
+      track('calendar_created', {
+        country: this.draft.country,
+        subdivision: this.draft.subdivision,
+        semester_count: this.draft.semesterCount ?? 2,
+        preset_events: selected.length,
+      })
       this.flash('Calendar created.')
     },
     saveSettings() {
@@ -418,9 +425,8 @@ document.addEventListener('alpine:init', () => {
       this.settingsOpen = false
       this.flash('Calendar settings saved.')
     },
-    deleteCalendar() {
-      if (!confirm(`Start over and delete “${this.activeCalendar.name}”? This cannot be undone.`)) return
-      this.state.calendar = null
+    // Reset to the fresh home screen and bring the welcome banner back.
+    startOver() {
       this.resetWizard()
       this.storageTipOpen = false
       this.dataHelpOpen = false
@@ -429,6 +435,12 @@ document.addEventListener('alpine:init', () => {
         localStorage.removeItem(WELCOME_NOTICE_KEY)
         localStorage.removeItem(STORAGE_TIP_KEY)
       } catch { /* storage unavailable */ }
+    },
+    deleteCalendar() {
+      if (!confirm(`Start over and delete “${this.activeCalendar.name}”? This cannot be undone.`)) return
+      this.state.calendar = null
+      track('calendar_deleted')
+      this.startOver()
     },
     openEvent(event = null) {
       this.eventForm = event ? plainClone(event) : {
@@ -461,6 +473,7 @@ document.addEventListener('alpine:init', () => {
       } else {
         calendar.events.push({ ...event, title: event.title.trim() })
       }
+      track('event_added', { category: event.category, editing: index !== null })
       this.eventDialogOpen = false
       this.flash('Event saved.')
     },
@@ -472,6 +485,7 @@ document.addEventListener('alpine:init', () => {
     exportCurrent() {
       const csv = exportCalendarCsv(this.activeCalendar)
       downloadCsv(csv, `${this.slug(this.activeCalendar.name)}.calendar.csv`)
+      track('calendar_exported')
     },
     async shareCurrent() {
       const csv = exportCalendarCsv(this.activeCalendar)
@@ -480,6 +494,8 @@ document.addEventListener('alpine:init', () => {
         if (!await shareCsv(csv, filename)) {
           downloadCsv(csv, filename)
           this.flash('Sharing is unavailable here, so the CSV file was downloaded.')
+        } else {
+          track('calendar_shared')
         }
       } catch (error) {
         if (error.name !== 'AbortError') {
@@ -510,6 +526,7 @@ document.addEventListener('alpine:init', () => {
       this.state.calendar = calendar
       this.importOpen = false
       this.importPreviews = []
+      track('calendar_imported')
       this.flash('Calendar imported.')
     },
     dismissWelcome(showStorageTip = true) {
@@ -528,8 +545,12 @@ document.addEventListener('alpine:init', () => {
     openDataHelp() {
       this.dismissStorageTip()
       this.dataHelpOpen = true
+      track('data_help_opened')
     },
-    printCalendar() { window.print() },
+    printCalendar() {
+      track('calendar_printed')
+      window.print()
+    },
     slug(value) {
       return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     },

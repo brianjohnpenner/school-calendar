@@ -22,9 +22,9 @@
               >Private, local, and printable</button>
             </span>
           </div>
-          <button class="btn-quiet shrink-0 gap-2" type="button" aria-label="Data and backup" @click="openDataHelp()">
+          <button class="btn-quiet shrink-0 gap-2" type="button" aria-label="How to save your data" @click="openDataHelp()">
             <svg class="size-5 text-cyan-800" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 3 6v6c0 5 3.8 8.5 9 10 5.2-1.5 9-5 9-10V6l-9-4Zm-1 13-3-3 1.4-1.4L11 12.2l4.6-4.6L17 9l-6 6Z"/></svg>
-            <span class="hidden sm:inline">Data &amp; backup</span>
+            <span class="hidden sm:inline">How to save your data</span>
           </button>
         </div>
       </header>
@@ -44,7 +44,7 @@
         <div class="min-w-0 flex-1">
           <strong class="block text-sm text-slate-900">Saved in this browser</strong>
           <p class="mt-1 text-xs leading-5 text-slate-600">Your calendar saves automatically on this device. Nothing is uploaded.</p>
-          <button class="mt-2 text-xs font-semibold text-cyan-800 hover:text-cyan-950" type="button" @click="openDataHelp()">How saving and backups work →</button>
+          <button class="mt-2 text-xs font-semibold text-cyan-800 hover:text-cyan-950" type="button" @click="openDataHelp()">How to save your data →</button>
         </div>
         <button class="btn-quiet -mr-2 -mt-2 size-8 shrink-0 p-0" type="button" aria-label="Dismiss storage message" @click="dismissStorageTip()">×</button>
       </aside>
@@ -364,7 +364,7 @@
             </ul>
 
             <div class="welcome-actions">
-              <button class="btn-primary" type="button" @click="dismissWelcome()">Create my calendar</button>
+              <button class="btn-primary" type="button" @click="dismissWelcome(false); openDataHelp()">Get Started</button>
               <button class="btn-quiet" type="button" @click="dismissWelcome(false); importOpen = true">Import a calendar</button>
             </div>
 
@@ -404,13 +404,13 @@
               </span>
               <div>
                 <p class="text-xs font-bold uppercase tracking-wide text-cyan-800">Private by design</p>
-                <h2 id="data-help-title" class="mt-1 text-xl font-semibold text-slate-900">How your calendar is saved</h2>
+                <h2 id="data-help-title" class="mt-1 text-xl font-semibold text-slate-900">How to save your data</h2>
               </div>
             </div>
             <button class="btn-quiet shrink-0" type="button" @click="dataHelpOpen = false">Close</button>
           </div>
 
-          <p class="mt-5 text-sm leading-6 text-slate-600">There is no account or cloud database behind this calendar. Your work is stored locally by this browser on this device.</p>
+          <p class="mt-5 text-sm leading-6 text-slate-600">Your work saves automatically in this browser, but it is not stored in an account or cloud database. Download a backup to keep it safe or move it to another device.</p>
 
           <div class="mt-6 grid gap-3 sm:grid-cols-2">
             <article class="rounded-xl border border-slate-200 p-4">
@@ -422,17 +422,21 @@
               <p class="mt-1 text-xs leading-5 text-slate-600">Your school name, dates, and events stay on your device and are not sent to a server.</p>
             </article>
             <article class="rounded-xl border border-slate-200 p-4">
-              <strong class="text-sm text-slate-900">Download a backup</strong>
+              <strong class="text-sm text-slate-900">1. Download a backup</strong>
               <p class="mt-1 text-xs leading-5 text-slate-600">Use Download to save a CSV backup. You can import that file later or move your calendar to another device.</p>
             </article>
             <article class="rounded-xl border border-slate-200 p-4">
-              <strong class="text-sm text-slate-900">Browser storage has limits</strong>
-              <p class="mt-1 text-xs leading-5 text-slate-600">Clearing site data, using a different browser, or switching devices will not carry your calendar with you.</p>
+              <strong class="text-sm text-slate-900">2. Keep the file somewhere safe</strong>
+              <p class="mt-1 text-xs leading-5 text-slate-600">Store the CSV with your other school files so it is available if this browser’s data is cleared.</p>
+            </article>
+            <article class="rounded-xl border border-slate-200 p-4 sm:col-span-2">
+              <strong class="text-sm text-slate-900">3. Import it when you need it</strong>
+              <p class="mt-1 text-xs leading-5 text-slate-600">Use Import to restore your calendar, open it in another browser, or move it to another device.</p>
             </article>
           </div>
 
           <div class="mt-5 rounded-xl bg-amber-50 p-4 text-xs leading-5 text-amber-900">
-            Download a backup before clearing browser data or moving to another device.
+            Browser storage does not move between browsers or devices. Download a backup before clearing browser data or moving your calendar.
           </div>
 
           <div class="mt-6 flex flex-wrap items-center justify-end gap-2">
